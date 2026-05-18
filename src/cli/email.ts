@@ -1,4 +1,3 @@
-import 'dotenv/config';
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
@@ -33,7 +32,7 @@ async function main() {
     process.exit(0);
   }
 
-  const provider = getProvider();
+  const provider = await getProvider();
   const { system, user } = buildEmailPrompt(profile, briefing);
 
   console.log(`[email] provider=${provider.name} model=${provider.model}`);

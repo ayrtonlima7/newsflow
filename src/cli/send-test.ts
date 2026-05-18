@@ -1,4 +1,4 @@
-import 'dotenv/config';
+import { config as loadEnv } from 'dotenv';
 import { readFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
@@ -7,6 +7,8 @@ import { Resend } from 'resend';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(__dirname, '../..');
+loadEnv({ path: resolve(ROOT, '.env.local'), quiet: true });
+loadEnv({ path: resolve(ROOT, '.env'), quiet: true });
 
 async function main() {
   const apiKey = process.env.RESEND_API_KEY;

@@ -1,0 +1,34 @@
+{
+  "area": "Gastronomia",
+  "cargo": "Cozinheira / Sous chef",
+  "topicos": [
+    "Técnicas de cocção e termodinâmica aplicada à cozinha",
+    "Fermentação e conservação (pão de fermentação natural, picles, missô)",
+    "Ingredientes brasileiros nativos (PANCs, frutas do cerrado, peixes de rio)",
+    "Gestão de cozinha profissional: ficha técnica, CMV, mise en place",
+    "Sazonalidade e mercado de hortifrúti no Brasil",
+    "Tendências de restaurantes (autorais, bistrôs, fine casual)"
+  ],
+  "ignorar": [
+    "Receitas básicas para iniciantes",
+    "Listas tipo '10 receitas fáceis para o dia a dia'",
+    "Celebridades e fofoca de chef",
+    "Conteúdo de dieta, low-carb, jejum intermitente",
+    "Receitas com glitter comestível, food porn estético sem técnica"
+  ],
+  "frequencia": "Dias úteis apenas",
+  "horario": "14h",
+  "tom": "Direto e técnico",
+  "fontes_prioritarias": [
+    "Eater",
+    "Bon Appétit (seção técnica)",
+    "Folha Cozinha Bruta",
+    "Prazeres da Mesa",
+    "Serious Eats",
+    "Instagram de chefs autorais brasileiros (Bel Coelho, Alex Atala, Helena Rizzo)"
+  ],
+  "descricoes_livres": {
+    "contexto": "Sou cozinheira há 7 anos, hoje sous chef em um bistrô autoral de médio porte em São Paulo. Estudei na escola Wilma Kovesi. Quero acompanhar técnica de verdade, novos ingredientes que estão chegando aos mercados, e o que outros restaurantes estão fazendo de relevante — não receita pronta para o usuário comum. Penso em abrir meu próprio lugar em 3 anos, então também me interessa entender o lado de gestão e mercado.",
+    "objetivo": "Quero abrir uma cozinha autoral com foco em produto nacional e técnica clássica francesa adaptada."
+  }
+}

@@ -1,7 +1,11 @@
-import 'dotenv/config';
-import { createAnthropicProvider } from './anthropic.ts';
-import { createGeminiProvider } from './gemini.ts';
-import { createDeepSeekProvider } from './deepseek.ts';
+import { config as loadEnv } from 'dotenv';
+import { fileURLToPath } from 'node:url';
+import { dirname, resolve } from 'node:path';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const ROOT = resolve(__dirname, '../../..');
+loadEnv({ path: resolve(ROOT, '.env.local'), quiet: true });
+loadEnv({ path: resolve(ROOT, '.env'), quiet: true });
 
 export type Message = { role: 'user' | 'assistant'; content: string };
 
@@ -31,15 +35,22 @@ export interface LLMProvider {
   complete(opts: CompleteOptions): Promise<CompleteResult>;
 }
 
-export function getProvider(name?: string): LLMProvider {
-  const choice = (name ?? process.env.LLM_PROVIDER ?? 'anthropic').toLowerCase();
+export async function getProvider(name?: string): Promise<LLMProvider> {
+  const choice = (name ?? process.env.LLM_PROVIDER ?? 'gemini').toLowerCase();
   switch (choice) {
     case 'anthropic':
-      return createAnthropicProvider();
-    case 'gemini':
+      throw new Error(
+        'Provider "anthropic" foi removido das dependências (você usa o plano Team separadamente). ' +
+          'Para reativar: npm i @anthropic-ai/sdk e restaurar src/lib/providers/anthropic.ts.',
+      );
+    case 'gemini': {
+      const { createGeminiProvider } = await import('./gemini.ts');
       return createGeminiProvider();
-    case 'deepseek':
+    }
+    case 'deepseek': {
+      const { createDeepSeekProvider } = await import('./deepseek.ts');
       return createDeepSeekProvider();
+    }
     default:
       throw new Error(
         `LLM_PROVIDER desconhecido: "${choice}". Valores válidos: anthropic, gemini, deepseek.`,

@@ -1,4 +1,3 @@
-import 'dotenv/config';
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
@@ -22,12 +21,12 @@ async function main() {
   }
 
   const profile: Profile = JSON.parse(await readFile(profilePath, 'utf8'));
-  const provider = getProvider();
+  const provider = await getProvider();
 
   if (!provider.supportsWebSearch) {
     console.error(
       `Provider "${provider.name}" não suporta busca web nativa. ` +
-        'Use LLM_PROVIDER=anthropic ou LLM_PROVIDER=gemini para a curadoria.',
+        'Use LLM_PROVIDER=gemini para a curadoria.',
     );
     process.exit(1);
   }

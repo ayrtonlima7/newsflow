@@ -43,7 +43,7 @@ async function main() {
     system,
     messages: [{ role: 'user', content: user }],
     webSearch: true,
-    maxTokens: 4096,
+    maxTokens: 8192,
   });
 
   const elapsed = ((Date.now() - t0) / 1000).toFixed(1);

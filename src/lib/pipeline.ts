@@ -38,7 +38,7 @@ export async function generateBriefing(
     system,
     messages: [{ role: 'user', content: user }],
     webSearch: true,
-    maxTokens: 4096,
+    maxTokens: 8192,
   });
   const elapsedSeconds = (Date.now() - t0) / 1000;
   if (!result.text.trim()) {
@@ -76,14 +76,16 @@ export async function generateEmail(
   profile: Profile,
   briefing: Briefing,
 ): Promise<{ email: EmailOutput; meta: PipelineMeta }> {
-  const provider = await getProvider();
+  // Permite usar um provider mais barato pro email (sem busca web).
+  // Ex: LLM_PROVIDER=gemini + EMAIL_LLM_PROVIDER=deepseek
+  const provider = await getProvider(process.env.EMAIL_LLM_PROVIDER);
   const { system, user } = buildEmailPrompt(profile, briefing);
   const t0 = Date.now();
   const result = await provider.complete({
     system,
     messages: [{ role: 'user', content: user }],
     webSearch: false,
-    maxTokens: 16384,
+    maxTokens: 8192,
     jsonMode: true,
   });
   const elapsedSeconds = (Date.now() - t0) / 1000;

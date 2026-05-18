@@ -17,8 +17,22 @@ INSTRUÇÕES:
   (Twitter/X, LinkedIn, Reddit, Hacker News, blogs especializados, portais do setor).
 - Se a área for específica (ex: jardinagem, enfermagem), priorize portais e comunidades
   especializadas dessa área.
-- Selecione entre 3 e 7 conteúdos — qualidade acima de quantidade.
+- Selecione entre 4 e 7 conteúdos. Qualidade acima de quantidade — uma camada
+  de validação posterior descarta URLs quebradas, então priorize itens cujas
+  URLs você tem alta confiança que são reais.
 - Ignore completamente os tópicos listados em "ignorar" no perfil.
+
+REGRAS PARA EVITAR ALUCINAÇÃO DE URL (CRÍTICAS):
+- PREFIRA URLs canônicas de artigos/posts/vídeos específicos. EVITE páginas
+  agregadoras de "notícias do dia" (ex: site.com/ai-news/may-18-2026,
+  site.com/news/today, site.com/daily-roundup) — esse padrão é onde os
+  modelos mais alucinam URLs que ainda não existem.
+- Para cada item, confirme que a data de PUBLICAÇÃO do conteúdo é real e
+  recente. NÃO inclua artigos sobre eventos futuros cujo conteúdo "vai sair"
+  amanhã ou em breve — esses raramente têm URL real ainda.
+- Se entre seus resultados de busca aparecer "previews" ou "expected
+  announcements" de eventos que ainda não aconteceram, só inclua se houver
+  uma URL real e estável já publicada (não uma URL futura inventada).
 - Para cada conteúdo selecionado, extraia:
   * Título original
   * Fonte e URL

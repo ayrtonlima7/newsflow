@@ -1,5 +1,5 @@
 import OpenAI from 'openai';
-import type { CompleteOptions, CompleteResult, LLMProvider } from './index.ts';
+import type { CompleteOptions, CompleteResult, LLMProvider } from './index';
 
 export function createDeepSeekProvider(): LLMProvider {
   const apiKey = process.env.DEEPSEEK_API_KEY;

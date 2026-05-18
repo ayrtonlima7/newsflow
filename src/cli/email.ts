@@ -2,10 +2,10 @@ import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { getProvider, extractJson } from '../lib/providers/index.ts';
-import { buildEmailPrompt } from '../prompts/email.ts';
-import { calculateCost, formatCost } from '../lib/pricing.ts';
-import type { Briefing, EmailOutput, Profile } from '../lib/types.ts';
+import { getProvider, extractJson } from '../lib/providers/index';
+import { buildEmailPrompt } from '../prompts/email';
+import { calculateCost, formatCost } from '../lib/pricing';
+import type { Briefing, EmailOutput, Profile } from '../lib/types';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(__dirname, '../..');

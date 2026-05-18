@@ -1,5 +1,5 @@
 import { GoogleGenAI } from '@google/genai';
-import type { CompleteOptions, CompleteResult, LLMProvider, Citation } from './index.ts';
+import type { CompleteOptions, CompleteResult, LLMProvider, Citation } from './index';
 
 const RETRY_STATUSES = new Set([429, 500, 502, 503, 504]);
 

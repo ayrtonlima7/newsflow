@@ -3,8 +3,12 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "NewsFlow AI — curadoria de conteúdo por IA. Fase 1: validação dos prompts via CLI.",
+  "description": "NewsFlow AI — curadoria de conteúdo por IA.",
   "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
     "curate": "tsx src/cli/curate.ts",
     "email": "tsx src/cli/email.ts",
     "send-test": "tsx src/cli/send-test.ts",
@@ -12,12 +16,23 @@
   },
   "dependencies": {
     "@google/genai": "^2.4.0",
+    "@supabase/ssr": "^0.5.2",
+    "@supabase/supabase-js": "^2.46.0",
+    "clsx": "^2.1.1",
     "dotenv": "^16.4.7",
+    "next": "^15.1.0",
     "openai": "^6.38.0",
-    "resend": "^6.12.0"
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "resend": "^6.12.0",
+    "tailwind-merge": "^2.5.5"
   },
   "devDependencies": {
+    "@tailwindcss/postcss": "^4.0.0",
     "@types/node": "^22.10.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "tailwindcss": "^4.0.0",
     "tsx": "^4.19.0",
     "typescript": "^5.7.0"
   }

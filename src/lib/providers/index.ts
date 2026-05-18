@@ -51,11 +51,11 @@ export async function getProvider(name?: string): Promise<LLMProvider> {
           'Para reativar: npm i @anthropic-ai/sdk e restaurar src/lib/providers/anthropic.ts.',
       );
     case 'gemini': {
-      const { createGeminiProvider } = await import('./gemini.ts');
+      const { createGeminiProvider } = await import('./gemini');
       return createGeminiProvider();
     }
     case 'deepseek': {
-      const { createDeepSeekProvider } = await import('./deepseek.ts');
+      const { createDeepSeekProvider } = await import('./deepseek');
       return createDeepSeekProvider();
     }
     default:

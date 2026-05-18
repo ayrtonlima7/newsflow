@@ -1,5 +1,5 @@
-import type { Profile } from '../lib/types.ts';
-import { frequenciaParaJanela } from '../lib/types.ts';
+import type { Profile } from '../lib/types';
+import { frequenciaParaJanela } from '../lib/types';
 
 export function buildCuratePrompt(profile: Profile): { system: string; user: string } {
   const { rotulo } = frequenciaParaJanela(profile.frequencia);

@@ -1,4 +1,4 @@
-import type { Briefing, Profile } from '../lib/types.ts';
+import type { Briefing, Profile } from '../lib/types';
 
 export function buildEmailPrompt(profile: Profile, briefing: Briefing): { system: string; user: string } {
   const system = `Você escreve para o leitor como um amigo mais experiente, atento e investido no crescimento profissional e pessoal dele.

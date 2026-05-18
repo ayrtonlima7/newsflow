@@ -1,0 +1,25 @@
+{
+  "name": "newsflow-ai",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "NewsFlow AI — curadoria de conteúdo por IA. Fase 1: validação dos prompts via CLI.",
+  "scripts": {
+    "curate": "tsx src/cli/curate.ts",
+    "email": "tsx src/cli/email.ts",
+    "send-test": "tsx src/cli/send-test.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.40.0",
+    "@google/genai": "^1.0.0",
+    "dotenv": "^16.4.7",
+    "openai": "^4.77.0",
+    "resend": "^4.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0"
+  }
+}

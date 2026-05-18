@@ -1,0 +1,27 @@
+{
+  "area": "Tecnologia",
+  "cargo": "Desenvolvedor",
+  "topicos": [
+    "Inteligência Artificial aplicada a produtos",
+    "Engenharia de software pragmática",
+    "Frontend moderno (React, Next.js)",
+    "Anthropic Claude e LLMs em produção"
+  ],
+  "ignorar": [
+    "Conteúdo muito básico/iniciante",
+    "Tutoriais passo a passo",
+    "Opinião e polêmica de redes sociais"
+  ],
+  "frequencia": "Todo dia de manhã",
+  "horario": "7h",
+  "tom": "Direto e técnico",
+  "fontes_prioritarias": [
+    "Hacker News",
+    "X/Twitter (desenvolvedores e founders)",
+    "Anthropic blog",
+    "Vercel blog"
+  ],
+  "descricoes_livres": {
+    "contexto": "Sou desenvolvedor solo construindo um SaaS de curadoria por IA. Quero entender o que está acontecendo na fronteira de produtos com LLMs e padrões de engenharia que economizam tempo na prática."
+  }
+}

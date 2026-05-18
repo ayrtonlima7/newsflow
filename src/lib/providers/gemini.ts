@@ -49,6 +49,7 @@ export function createGeminiProvider(): LLMProvider {
             maxOutputTokens: opts.maxTokens ?? 4096,
             temperature: opts.temperature,
             tools: opts.webSearch ? [{ googleSearch: {} }] : undefined,
+            responseMimeType: opts.jsonMode && !opts.webSearch ? 'application/json' : undefined,
           },
         }),
       );

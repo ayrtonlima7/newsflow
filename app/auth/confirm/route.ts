@@ -16,18 +16,18 @@ export async function GET(request: NextRequest) {
   if (code) {
     const { error } = await supabase.auth.exchangeCodeForSession(code);
     if (error) {
-      redirect(`/login?error=${encodeURIComponent(error.message)}`);
+      redirect(`/login?error=${encodeURIComponent(error.message)}` as never);
     }
-    redirect(next);
+    redirect(next as never);
   }
 
   // Fallback: token_hash flow (formato antigo)
   if (token_hash && type) {
     const { error } = await supabase.auth.verifyOtp({ type, token_hash });
     if (error) {
-      redirect(`/login?error=${encodeURIComponent(error.message)}`);
+      redirect(`/login?error=${encodeURIComponent(error.message)}` as never);
     }
-    redirect(next);
+    redirect(next as never);
   }
 
   redirect('/login?error=missing-token');

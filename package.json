@@ -12,6 +12,7 @@
     "curate": "tsx src/cli/curate.ts",
     "email": "tsx src/cli/email.ts",
     "send-test": "tsx src/cli/send-test.ts",
+    "deliver": "tsx src/cli/deliver.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

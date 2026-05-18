@@ -15,6 +15,7 @@ export interface CompleteOptions {
   webSearch?: boolean;
   maxTokens?: number;
   temperature?: number;
+  jsonMode?: boolean;
 }
 
 export interface Citation {

@@ -30,6 +30,7 @@ export function createDeepSeekProvider(): LLMProvider {
         messages,
         max_tokens: opts.maxTokens ?? 4096,
         temperature: opts.temperature,
+        response_format: opts.jsonMode ? { type: 'json_object' } : undefined,
       });
 
       const text = response.choices[0]?.message?.content ?? '';

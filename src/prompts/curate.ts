@@ -1,5 +1,12 @@
-import type { Profile } from '../lib/types';
+import type { Profile, BriefingItem } from '../lib/types';
 import { frequenciaParaJanela } from '../lib/types';
+
+export interface RetryContext {
+  validItems: BriefingItem[];
+  brokenItems: { titulo: string; url: string; reason: string }[];
+  targetMin: number;
+  targetMax: number;
+}
 
 export function buildCuratePrompt(profile: Profile): { system: string; user: string } {
   const { rotulo } = frequenciaParaJanela(profile.frequencia);
@@ -57,6 +64,15 @@ REGRAS CRÍTICAS SOBRE URLS:
 - Se um conteúdo é interessante mas você não conseguiu confirmar a URL
   real, DESCARTE — é melhor entregar 3 itens verificáveis do que 5
   itens com 2 links quebrados.
+- Atenção especial a IDs de posts (Reddit /comments/<id>, YouTube ?v=<id>,
+  HackerNews item?id=<id>, tweets/X status/<id>): esses IDs são curtos e
+  arbitrários, e modelos costumam inventá-los com aparência plausível. Só
+  inclua se o ID vier literalmente de um resultado de busca específico —
+  na dúvida, descarte.
+- Twitter/X e LinkedIn bloqueiam validação automática, então URLs desses
+  sites caem direto no risco de falso positivo. Use com moderação e só
+  quando tiver alta confiança que o post existe — prefira artigos em
+  blogs/portais com URL canônica.
 
 - Se não encontrar nada relevante, retorne "itens": [].
 
@@ -73,6 +89,75 @@ RESPONDA APENAS COM UM JSON VÁLIDO, sem markdown, sem texto antes ou depois:
       "resumo": ""
     }
   ]
+}`;
+
+  return { system, user };
+}
+
+export function buildRetryCuratePrompt(
+  profile: Profile,
+  ctx: RetryContext,
+): { system: string; user: string } {
+  const { rotulo } = frequenciaParaJanela(profile.frequencia);
+
+  const system =
+    'Você é um agente de curadoria de conteúdo profissional executando uma SEGUNDA tentativa. ' +
+    'Uma rodada anterior produziu itens com URLs inválidas que foram descartadas pela validação. ' +
+    `Sua tarefa agora é encontrar conteúdos REAIS e VERIFICÁVEIS publicados nas ${rotulo}, ` +
+    'cuidando para não repetir os erros anteriores.';
+
+  const brokenList = ctx.brokenItems
+    .map((b, i) => `  ${i + 1}. "${b.titulo}"\n     URL: ${b.url}\n     Motivo: ${b.reason}`)
+    .join('\n');
+
+  const keptList =
+    ctx.validItems.length > 0
+      ? '\n\nITENS JÁ APROVADOS (NÃO REPITA — busque conteúdos diferentes):\n' +
+        ctx.validItems.map((v, i) => `  ${i + 1}. ${v.titulo} (${v.url})`).join('\n')
+      : '';
+
+  const needed = Math.max(ctx.targetMin - ctx.validItems.length, 1);
+  const max = Math.max(ctx.targetMax - ctx.validItems.length, needed);
+
+  const user = `PERFIL DO USUÁRIO:
+${JSON.stringify(profile, null, 2)}
+
+ITENS QUE FALHARAM NA TENTATIVA ANTERIOR (URLs inválidas):
+${brokenList}
+${keptList}
+
+INSTRUÇÕES PARA ESTA TENTATIVA:
+- Encontre ${needed} a ${max} NOVOS conteúdos para completar o briefing.
+- NÃO repita nenhum item da lista de aprovados nem da lista de falhados.
+- NÃO use a mesma URL que falhou — busque conteúdo de outras fontes.
+- Aplique as MESMAS regras de qualidade do curate original:
+  * Resumo de 6-10 linhas, denso, com fatos concretos
+  * Relevância Alta ou Média
+  * Motivo de relevância (1 frase)
+
+REGRAS CRÍTICAS DE URL (REFORÇADAS — a tentativa anterior falhou aqui):
+- COLE URLs verbatim dos seus resultados de busca. Não modifique, não complete,
+  não construa por padrão. Se você "lembra" de um artigo mas não vê a URL no
+  search atual, DESCARTE.
+- NUNCA invente IDs de posts (Reddit /comments/<id>, YouTube ?v=<id>,
+  HackerNews item?id=<id>, X status/<id>). Esses IDs são curtos e seu cérebro
+  vai querer completá-los — resista. Só inclua se o ID estiver literal no resultado.
+- PREFIRA URLs canônicas de artigos/posts específicos sobre páginas
+  agregadoras com data (ex: /news/today, /ai-news/may-18-2026).
+- Se você não encontrar URLs verificáveis suficientes, retorne MENOS itens
+  do que o solicitado — é melhor 1 item real do que 4 inventados.
+
+RESPONDA APENAS COM UM JSON VÁLIDO, sem markdown, sem texto antes ou depois:
+{
+  "data_referencia": "YYYY-MM-DD",
+  "itens": [ {
+    "titulo": "",
+    "fonte": "",
+    "url": "",
+    "relevancia": "Alta",
+    "motivo_relevancia": "",
+    "resumo": ""
+  } ]
 }`;
 
   return { system, user };

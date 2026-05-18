@@ -49,6 +49,23 @@ export async function validateUrl(url: string): Promise<{ ok: boolean; reason?: 
     return { ok: false, reason: `protocolo inválido: ${parsed.protocol}` };
   }
 
+  // Validadores content-aware: sites que retornam 200 mesmo pra conteúdo
+  // inexistente precisam de checagem via API específica.
+  const host = parsed.host.toLowerCase().replace(/^www\./, '');
+  if (host === 'reddit.com' || host === 'old.reddit.com' || host === 'new.reddit.com') {
+    return validateReddit(url);
+  }
+  if (host === 'youtube.com' || host === 'm.youtube.com' || host === 'youtu.be') {
+    return validateYoutube(url);
+  }
+  if (host === 'news.ycombinator.com') {
+    return validateHackerNews(parsed);
+  }
+
+  return validateGeneric(url);
+}
+
+async function validateGeneric(url: string): Promise<{ ok: boolean; reason?: string }> {
   try {
     const head = await fetchWithTimeout(url, {
       method: 'HEAD',
@@ -56,14 +73,88 @@ export async function validateUrl(url: string): Promise<{ ok: boolean; reason?: 
       headers: { 'user-agent': USER_AGENT, accept: '*/*' },
     });
     if (head.status >= 200 && head.status < 400) return { ok: true };
-    // Alguns servidores não suportam HEAD (405) ou bloqueiam (403). Tenta GET parcial.
     if (head.status === 405 || head.status === 403 || head.status === 501) {
       return await validateWithGet(url);
     }
     return { ok: false, reason: `HTTP ${head.status}` };
   } catch (err) {
-    // Se HEAD falhou por rede/timeout, tenta GET antes de descartar.
     return await validateWithGet(url, err);
+  }
+}
+
+async function validateReddit(url: string): Promise<{ ok: boolean; reason?: string }> {
+  // Post: /r/<sub>/comments/<id>[/<slug>/]
+  // Subreddit: /r/<sub>/   |   User: /user/<name>/
+  const postMatch = url.match(/reddit\.com\/r\/([^/?#]+)\/comments\/([^/?#]+)/i);
+  if (postMatch) {
+    const [, sub, id] = postMatch;
+    try {
+      const apiUrl = `https://www.reddit.com/r/${sub}/comments/${id}.json?limit=1&raw_json=1`;
+      const res = await fetchWithTimeout(apiUrl, {
+        method: 'GET',
+        redirect: 'follow',
+        headers: { 'user-agent': USER_AGENT, accept: 'application/json' },
+      });
+      if (!res.ok) return { ok: false, reason: `Reddit API HTTP ${res.status}` };
+      const data = (await res.json()) as unknown;
+      if (!Array.isArray(data) || data.length === 0) {
+        return { ok: false, reason: 'Reddit post não encontrado (resposta vazia)' };
+      }
+      const listing = data[0] as { data?: { children?: unknown[] } };
+      const children = listing?.data?.children;
+      if (!Array.isArray(children) || children.length === 0) {
+        return { ok: false, reason: 'Reddit post não existe (listing vazio)' };
+      }
+      return { ok: true };
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      return { ok: false, reason: `Reddit check falhou: ${msg}` };
+    }
+  }
+  // Não é URL de post — usa checagem genérica
+  return validateGeneric(url);
+}
+
+async function validateYoutube(url: string): Promise<{ ok: boolean; reason?: string }> {
+  // YouTube oEmbed retorna 401/404 pra vídeo inexistente, 200 com JSON pra existente.
+  try {
+    const oembed = `https://www.youtube.com/oembed?url=${encodeURIComponent(url)}&format=json`;
+    const res = await fetchWithTimeout(oembed, {
+      method: 'GET',
+      redirect: 'follow',
+      headers: { 'user-agent': USER_AGENT, accept: 'application/json' },
+    });
+    if (res.status === 200) return { ok: true };
+    if (res.status === 401 || res.status === 404) {
+      return { ok: false, reason: 'YouTube vídeo não existe ou é privado' };
+    }
+    return { ok: false, reason: `YouTube oEmbed HTTP ${res.status}` };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return { ok: false, reason: `YouTube check falhou: ${msg}` };
+  }
+}
+
+async function validateHackerNews(parsed: URL): Promise<{ ok: boolean; reason?: string }> {
+  // Post: news.ycombinator.com/item?id=<id>
+  const id = parsed.searchParams.get('id');
+  if (!id || !/^\d+$/.test(id)) {
+    return validateGeneric(parsed.toString());
+  }
+  try {
+    const apiUrl = `https://hacker-news.firebaseio.com/v0/item/${id}.json`;
+    const res = await fetchWithTimeout(apiUrl, {
+      method: 'GET',
+      redirect: 'follow',
+      headers: { 'user-agent': USER_AGENT, accept: 'application/json' },
+    });
+    if (!res.ok) return { ok: false, reason: `HN API HTTP ${res.status}` };
+    const data = (await res.json()) as unknown;
+    if (data === null) return { ok: false, reason: 'HN item não existe' };
+    return { ok: true };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return { ok: false, reason: `HN check falhou: ${msg}` };
   }
 }
 

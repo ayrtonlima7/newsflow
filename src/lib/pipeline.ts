@@ -1,9 +1,13 @@
 import { getProvider, extractJson } from './providers';
-import { buildCuratePrompt } from '../prompts/curate';
+import { buildCuratePrompt, buildRetryCuratePrompt } from '../prompts/curate';
 import { buildEmailPrompt } from '../prompts/email';
 import { calculateCost } from './pricing';
 import { validateBriefingUrls, type DroppedItem } from './url-validation';
 import type { Profile, Briefing, EmailOutput } from './types';
+
+const MIN_VALID_ITEMS = 3;
+const TARGET_MIN = 4;
+const TARGET_MAX = 7;
 
 export interface PipelineUsage {
   inputTokens: number;
@@ -21,6 +25,7 @@ export interface PipelineMeta {
   cost: ReturnType<typeof calculateCost>;
   citations?: { url: string; title?: string }[];
   droppedItems?: DroppedItem[];
+  retryRan?: boolean;
 }
 
 export async function generateBriefing(
@@ -55,20 +60,134 @@ export async function generateBriefing(
       console.warn(`  - "${d.item.titulo}" → ${d.reason} (${d.item.url})`);
     }
   }
-  briefing.itens = validItems;
 
-  const cost = calculateCost(provider.model, result.usage);
+  // Aggregate accumulators (cost/usage somam retry; itens são merge)
+  const accValid: typeof validItems = [...validItems];
+  const accDropped: typeof droppedItems = [...droppedItems];
+  let accUsage = { ...result.usage };
+  let accElapsedSeconds = elapsedSeconds;
+  let retryRan = false;
+
+  // Retry pass: só se poucos válidos sobreviveram E houve descartes (evita loop quando o modelo simplesmente retornou pouco)
+  if (validItems.length < MIN_VALID_ITEMS && droppedItems.length > 0) {
+    console.warn(
+      `[curate] só ${validItems.length} item(s) válido(s) (alvo: ${MIN_VALID_ITEMS}+). Executando retry pass…`,
+    );
+    const retryResult = await retryCurate(profile, accValid, accDropped);
+    retryRan = true;
+    if (retryResult) {
+      accValid.push(...retryResult.newValidItems);
+      accDropped.push(...retryResult.newDroppedItems);
+      accUsage = sumUsage(accUsage, retryResult.usage);
+      accElapsedSeconds += retryResult.elapsedSeconds;
+      console.warn(
+        `[curate] retry: +${retryResult.newValidItems.length} válido(s), +${retryResult.newDroppedItems.length} descartado(s). Total agora: ${accValid.length} item(s).`,
+      );
+    } else {
+      console.warn('[curate] retry pass não conseguiu executar (provider sem web search?)');
+    }
+  }
+
+  briefing.itens = accValid;
+
+  const cost = calculateCost(provider.model, accUsage);
   return {
     briefing,
     meta: {
       provider: provider.name,
       model: provider.model,
-      elapsedSeconds,
-      usage: result.usage,
+      elapsedSeconds: accElapsedSeconds,
+      usage: accUsage,
       cost,
       citations: result.citations,
-      droppedItems,
+      droppedItems: accDropped,
+      ...(retryRan ? { retryRan: true } : {}),
     },
+  };
+}
+
+function sumUsage(a: PipelineUsage, b: PipelineUsage): PipelineUsage {
+  return {
+    inputTokens: a.inputTokens + b.inputTokens,
+    outputTokens: a.outputTokens + b.outputTokens,
+    toolTokens: a.toolTokens + b.toolTokens,
+    totalTokens: a.totalTokens + b.totalTokens,
+    groundingRequests: a.groundingRequests + b.groundingRequests,
+  };
+}
+
+async function retryCurate(
+  profile: Profile,
+  validItems: Briefing['itens'],
+  droppedItems: DroppedItem[],
+): Promise<{
+  newValidItems: Briefing['itens'];
+  newDroppedItems: DroppedItem[];
+  usage: PipelineUsage;
+  elapsedSeconds: number;
+} | null> {
+  const provider = await getProvider();
+  if (!provider.supportsWebSearch) return null;
+
+  const { system, user } = buildRetryCuratePrompt(profile, {
+    validItems,
+    brokenItems: droppedItems.map((d) => ({
+      titulo: d.item.titulo,
+      url: d.item.url,
+      reason: d.reason,
+    })),
+    targetMin: TARGET_MIN,
+    targetMax: TARGET_MAX,
+  });
+
+  const t0 = Date.now();
+  const result = await provider.complete({
+    system,
+    messages: [{ role: 'user', content: user }],
+    webSearch: true,
+    maxTokens: 8192,
+  });
+  const elapsedSeconds = (Date.now() - t0) / 1000;
+
+  if (!result.text.trim()) {
+    console.warn('[curate.retry] resposta vazia');
+    return { newValidItems: [], newDroppedItems: [], usage: result.usage, elapsedSeconds };
+  }
+
+  let retryBriefing: Briefing;
+  try {
+    retryBriefing = extractJson<Briefing>(result.text);
+  } catch (err) {
+    console.warn('[curate.retry] falha ao parsear JSON:', err);
+    return { newValidItems: [], newDroppedItems: [], usage: result.usage, elapsedSeconds };
+  }
+
+  // Filtra URLs já presentes no primeiro pass (válidas ou descartadas) — modelo pode ter ignorado instrução
+  const seen = new Set<string>([
+    ...validItems.map((v) => v.url),
+    ...droppedItems.map((d) => d.item.url),
+  ]);
+  const candidates = retryBriefing.itens.filter((i) => !seen.has(i.url));
+  if (candidates.length < retryBriefing.itens.length) {
+    console.warn(
+      `[curate.retry] modelo retornou ${retryBriefing.itens.length - candidates.length} item(s) repetido(s) — descartados`,
+    );
+  }
+
+  const { validItems: retryValid, droppedItems: retryDropped } =
+    await validateBriefingUrls(candidates);
+  if (retryDropped.length > 0) {
+    console.warn(`[curate.retry] validação derrubou ${retryDropped.length}/${candidates.length}:`);
+    for (const d of retryDropped) {
+      console.warn(`  - "${d.item.titulo}" → ${d.reason}`);
+    }
+  }
+
+  return {
+    newValidItems: retryValid,
+    newDroppedItems: retryDropped,
+    usage: result.usage,
+    elapsedSeconds,
   };
 }
 

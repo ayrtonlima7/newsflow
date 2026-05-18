@@ -30,6 +30,20 @@ INSTRUÇÕES:
     detalhes-chave por receio de "spoiler" — esse não é um produto de
     teaser, é um produto de conhecimento.
   * Nível de relevância: Alta ou Média
+
+REGRAS CRÍTICAS SOBRE URLS:
+- A URL DEVE ser exatamente a URL real do artigo/post/vídeo que veio dos
+  seus resultados de busca. Cole a URL verbatim como apareceu na busca.
+- NUNCA invente, adivinhe, complete ou modifique URLs.
+- NUNCA use placeholders como "your_video_id", "example.com", "TODO",
+  "[ID]", "..." ou qualquer template — se você não tem a URL real, não
+  inclua o item.
+- NUNCA mescle informação de um artigo com a URL de outro. Cada item
+  precisa ser fielmente do conteúdo daquela URL específica.
+- Se um conteúdo é interessante mas você não conseguiu confirmar a URL
+  real, DESCARTE — é melhor entregar 3 itens verificáveis do que 5
+  itens com 2 links quebrados.
+
 - Se não encontrar nada relevante, retorne "itens": [].
 
 RESPONDA APENAS COM UM JSON VÁLIDO, sem markdown, sem texto antes ou depois:

@@ -2,6 +2,7 @@ import { getProvider, extractJson } from './providers';
 import { buildCuratePrompt } from '../prompts/curate';
 import { buildEmailPrompt } from '../prompts/email';
 import { calculateCost } from './pricing';
+import { validateBriefingUrls, type DroppedItem } from './url-validation';
 import type { Profile, Briefing, EmailOutput } from './types';
 
 export interface PipelineUsage {
@@ -19,6 +20,7 @@ export interface PipelineMeta {
   usage: PipelineUsage;
   cost: ReturnType<typeof calculateCost>;
   citations?: { url: string; title?: string }[];
+  droppedItems?: DroppedItem[];
 }
 
 export async function generateBriefing(
@@ -43,6 +45,18 @@ export async function generateBriefing(
     throw new Error('curate: resposta vazia do modelo (tokens esgotados em raciocínio?)');
   }
   const briefing = extractJson<Briefing>(result.text);
+
+  const { validItems, droppedItems } = await validateBriefingUrls(briefing.itens);
+  if (droppedItems.length > 0) {
+    console.warn(
+      `[curate] ${droppedItems.length}/${briefing.itens.length} item(s) descartado(s) por URL inválida:`,
+    );
+    for (const d of droppedItems) {
+      console.warn(`  - "${d.item.titulo}" → ${d.reason} (${d.item.url})`);
+    }
+  }
+  briefing.itens = validItems;
+
   const cost = calculateCost(provider.model, result.usage);
   return {
     briefing,
@@ -53,6 +67,7 @@ export async function generateBriefing(
       usage: result.usage,
       cost,
       citations: result.citations,
+      droppedItems,
     },
   };
 }

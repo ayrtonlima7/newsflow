@@ -13,6 +13,7 @@
     "email": "tsx src/cli/email.ts",
     "send-test": "tsx src/cli/send-test.ts",
     "deliver": "tsx src/cli/deliver.ts",
+    "preview": "tsx src/cli/preview.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

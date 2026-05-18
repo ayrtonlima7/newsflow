@@ -23,7 +23,12 @@ INSTRUÇÕES:
   * Título original
   * Fonte e URL
   * Por que isso é relevante para esse usuário (1 frase)
-  * Resumo do conteúdo (3 a 5 linhas, sem spoiler completo)
+  * Resumo do conteúdo: 6 a 10 linhas, denso, com fatos concretos —
+    números, nomes, datas, citações, contexto e implicações. O leitor
+    raramente vai clicar no link original; o resumo precisa ser
+    autocontido o suficiente para ele ENTENDER o assunto. Não esconda
+    detalhes-chave por receio de "spoiler" — esse não é um produto de
+    teaser, é um produto de conhecimento.
   * Nível de relevância: Alta ou Média
 - Se não encontrar nada relevante, retorne "itens": [].
 

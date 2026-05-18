@@ -4,6 +4,7 @@ import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { getProvider, extractJson } from '../lib/providers/index.ts';
 import { buildEmailPrompt } from '../prompts/email.ts';
+import { calculateCost, formatCost } from '../lib/pricing.ts';
 import type { Briefing, EmailOutput, Profile } from '../lib/types.ts';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -48,6 +49,8 @@ async function main() {
 
   const elapsed = ((Date.now() - t0) / 1000).toFixed(1);
   console.log(`[email] resposta recebida em ${elapsed}s`);
+  const cost = calculateCost(provider.model, result.usage);
+  console.log(`[email] ${formatCost(result.usage, cost, provider.model)}`);
 
   const email = extractJson<EmailOutput>(result.text);
 
@@ -65,6 +68,8 @@ async function main() {
         timestamp: new Date().toISOString(),
         elapsed_seconds: Number(elapsed),
         briefing_path: briefingPath,
+        usage: result.usage,
+        cost,
       },
       null,
       2,

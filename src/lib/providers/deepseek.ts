@@ -33,7 +33,19 @@ export function createDeepSeekProvider(): LLMProvider {
       });
 
       const text = response.choices[0]?.message?.content ?? '';
-      return { text: text.trim(), citations: [], raw: response };
+      const u = response.usage;
+      return {
+        text: text.trim(),
+        citations: [],
+        usage: {
+          inputTokens: u?.prompt_tokens ?? 0,
+          outputTokens: u?.completion_tokens ?? 0,
+          toolTokens: 0,
+          totalTokens: u?.total_tokens ?? 0,
+          groundingRequests: 0,
+        },
+        raw: response,
+      };
     },
   };
 }

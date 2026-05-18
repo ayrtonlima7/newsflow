@@ -25,6 +25,13 @@ export interface Citation {
 export interface CompleteResult {
   text: string;
   citations: Citation[];
+  usage: {
+    inputTokens: number;
+    outputTokens: number;
+    toolTokens: number;
+    totalTokens: number;
+    groundingRequests: number;
+  };
   raw: unknown;
 }
 

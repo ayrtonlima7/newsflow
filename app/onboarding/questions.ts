@@ -1,7 +1,7 @@
 import type { Profile } from '@/src/lib/types';
 
 type BaseQuestion = {
-  id: keyof Omit<Profile, 'descricoes_livres'>;
+  id: keyof Omit<Profile, 'descricoes_livres' | 'topicos_busca'>;
   question: string;
   helper?: string;
   chips: string[];

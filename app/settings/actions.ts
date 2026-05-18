@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
+import { normalizeTopics } from '@/src/lib/topic-normalization';
 
 export interface ProfileUpdateInput {
   area: string;
@@ -33,12 +34,18 @@ export async function updateProfile(
     return { ok: false, error: 'frequência, horário e tom são obrigatórios' };
   }
 
+  const topicos_busca = await normalizeTopics(input.topicos, {
+    area: input.area.trim(),
+    cargo: input.cargo.trim(),
+  });
+
   const { error } = await supabase
     .from('profiles')
     .update({
       area: input.area.trim(),
       cargo: input.cargo.trim(),
       topicos: input.topicos,
+      topicos_busca,
       ignorar: input.ignorar ?? [],
       frequencia: input.frequencia.trim(),
       horario: input.horario.trim(),

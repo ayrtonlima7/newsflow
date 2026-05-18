@@ -65,6 +65,7 @@ async function main() {
     area: profileRow.area,
     cargo: profileRow.cargo,
     topicos: profileRow.topicos,
+    topicos_busca: profileRow.topicos_busca ?? undefined,
     ignorar: profileRow.ignorar,
     frequencia: profileRow.frequencia,
     horario: profileRow.horario,

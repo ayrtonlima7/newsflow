@@ -3,6 +3,7 @@
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { getProvider, extractJson } from '@/src/lib/providers';
+import { normalizeTopics } from '@/src/lib/topic-normalization';
 import type { Profile } from '@/src/lib/types';
 
 export async function generateTopicSuggestions(
@@ -68,12 +69,18 @@ export async function saveProfile(profile: Profile): Promise<{ ok: boolean; erro
     return { ok: false, error: 'área, cargo e ao menos um tópico são obrigatórios' };
   }
 
+  const topicos_busca = await normalizeTopics(profile.topicos, {
+    area: profile.area,
+    cargo: profile.cargo,
+  });
+
   const { error } = await supabase.from('profiles').upsert(
     {
       user_id: user.id,
       area: profile.area,
       cargo: profile.cargo,
       topicos: profile.topicos,
+      topicos_busca,
       ignorar: profile.ignorar,
       frequencia: profile.frequencia,
       horario: profile.horario,

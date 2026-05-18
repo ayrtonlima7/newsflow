@@ -137,6 +137,7 @@ export async function GET(req: NextRequest) {
           area: profile.area,
           cargo: profile.cargo,
           topicos: profile.topicos,
+          topicos_busca: profile.topicos_busca ?? undefined,
           ignorar: profile.ignorar,
           frequencia: profile.frequencia,
           horario: profile.horario,

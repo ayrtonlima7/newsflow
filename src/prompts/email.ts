@@ -1,4 +1,5 @@
 import type { Briefing, Profile } from '../lib/types';
+import { profileForPrompt } from '../lib/types';
 
 export function buildEmailPrompt(profile: Profile, briefing: Briefing): { system: string; user: string } {
   const system = `Você escreve para o leitor como um amigo mais experiente, atento e investido no crescimento profissional e pessoal dele.
@@ -8,7 +9,7 @@ Você leu tudo, separou o que importa, e está repassando — com os detalhes cr
 Nunca soa institucional, nunca soa "newsletter de marca", nunca tenta vender. Soa como uma pessoa real escrevendo para outra pessoa real. O tom específico (técnico, leve, formal, etc.) sai do perfil do usuário, mas a postura por baixo é sempre essa: amigo atento que está te contando o que precisa saber, com as informações cruciais já dentro do email — sem te obrigar a clicar para entender.`;
 
   const user = `PERFIL DO USUÁRIO:
-${JSON.stringify(profile, null, 2)}
+${JSON.stringify(profileForPrompt(profile), null, 2)}
 
 BRIEFING DE CONTEÚDOS:
 ${JSON.stringify(briefing, null, 2)}

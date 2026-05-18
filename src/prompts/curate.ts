@@ -1,5 +1,5 @@
 import type { Profile, BriefingItem } from '../lib/types';
-import { frequenciaParaJanela } from '../lib/types';
+import { frequenciaParaJanela, profileForPrompt } from '../lib/types';
 
 export interface RetryContext {
   validItems: BriefingItem[];
@@ -17,7 +17,7 @@ export function buildCuratePrompt(profile: Profile): { system: string; user: str
     `os conteúdos mais relevantes publicados nas ${rotulo}.`;
 
   const user = `PERFIL DO USUÁRIO:
-${JSON.stringify(profile, null, 2)}
+${JSON.stringify(profileForPrompt(profile), null, 2)}
 
 INSTRUÇÕES:
 - Pesquise nas fontes indicadas pelo usuário e nas fontes convencionais da área dele
@@ -120,7 +120,7 @@ export function buildRetryCuratePrompt(
   const max = Math.max(ctx.targetMax - ctx.validItems.length, needed);
 
   const user = `PERFIL DO USUÁRIO:
-${JSON.stringify(profile, null, 2)}
+${JSON.stringify(profileForPrompt(profile), null, 2)}
 
 ITENS QUE FALHARAM NA TENTATIVA ANTERIOR (URLs inválidas):
 ${brokenList}

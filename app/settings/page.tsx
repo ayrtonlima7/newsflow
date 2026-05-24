@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { signOut } from '@/app/login/actions';
@@ -29,6 +30,8 @@ export default async function SettingsPage({
 
   if (!profile) redirect('/onboarding');
 
+  const isAdmin = !!process.env.ADMIN_EMAIL && user.email === process.env.ADMIN_EMAIL;
+
   const initial = {
     area: profile.area,
     cargo: profile.cargo,
@@ -51,14 +54,24 @@ export default async function SettingsPage({
             no próximo envio.
           </p>
         </div>
-        <form action={signOut}>
-          <button
-            type="submit"
-            className="rounded-md border border-[var(--color-border)] bg-white px-4 py-2 text-sm hover:border-[var(--color-fg)]"
-          >
-            Sair
-          </button>
-        </form>
+        <div className="flex shrink-0 items-center gap-2">
+          {isAdmin && (
+            <Link
+              href="/admin"
+              className="rounded-md border border-[var(--color-fg)] bg-[var(--color-fg)] px-4 py-2 text-sm text-white transition hover:opacity-90"
+            >
+              Admin
+            </Link>
+          )}
+          <form action={signOut}>
+            <button
+              type="submit"
+              className="rounded-md border border-[var(--color-border)] bg-white px-4 py-2 text-sm hover:border-[var(--color-fg)]"
+            >
+              Sair
+            </button>
+          </form>
+        </div>
       </div>
 
       {welcome && (

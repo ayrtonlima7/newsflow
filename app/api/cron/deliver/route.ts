@@ -44,14 +44,11 @@ function isDue(
 ): { due: true } | { due: false; reason: string } {
   if (!profile.is_active) return { due: false, reason: 'inativo' };
 
-  const targetHour = parseHorario(profile.horario);
-  if (targetHour === null) {
-    return { due: false, reason: `horário inválido: "${profile.horario}"` };
-  }
-  const currentHour = spHourNow(now);
-  if (currentHour !== targetHour) {
-    return { due: false, reason: `hora SP ${currentHour}h != alvo ${targetHour}h` };
-  }
+  // NOTA: No Vercel Hobby, o cron só roda 1×/dia (configurado em vercel.json
+  // pra 11h UTC = 8h SP). Por isso a granularidade de horário do perfil
+  // (profile.horario) é IGNORADA aqui — todos recebem por volta das 8h SP.
+  // Quando upgradar pra Pro e o cron voltar a ser horário (`0 * * * *`),
+  // reativar a checagem `parseHorario(profile.horario) === spHourNow(now)`.
 
   if (profile.last_delivered_at) {
     const last = new Date(profile.last_delivered_at).getTime();

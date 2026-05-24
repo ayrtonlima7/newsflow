@@ -66,9 +66,10 @@ export const questions: Question[] = [
   {
     id: 'horario',
     type: 'single',
-    question: 'Qual horário prefere?',
-    chips: ['7h', '8h', '12h', '18h', '21h'],
-    allowFree: true,
+    question: 'Que horas o email chega?',
+    helper: 'No beta, todos os emails saem por volta das 8h da manhã (SP). Personalização de horário em breve.',
+    chips: ['8h'],
+    allowFree: false,
   },
   {
     id: 'tom',

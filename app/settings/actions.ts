@@ -72,7 +72,12 @@ export interface SampleResult {
   costBrl?: number;
   elapsedSeconds?: number;
   status?: string;
+  cooldownRemainingMs?: number;
 }
+
+// Cooldown entre cliques no "Enviar agora" pra evitar spam de geração e
+// gastos de API descontrolados. Vale por usuário.
+export const SAMPLE_COOLDOWN_MS = 5 * 60 * 1000;
 
 export async function sendSampleNow(): Promise<SampleResult> {
   const supabase = await createClient();
@@ -88,6 +93,21 @@ export async function sendSampleNow(): Promise<SampleResult> {
     .maybeSingle();
   if (error) return { ok: false, error: error.message };
   if (!profileRow) return { ok: false, error: 'perfil não encontrado' };
+
+  // Checagem de cooldown — não confiar só no frontend, validar aqui também
+  if (profileRow.last_delivered_at) {
+    const last = new Date(profileRow.last_delivered_at).getTime();
+    const elapsed = Date.now() - last;
+    if (elapsed < SAMPLE_COOLDOWN_MS) {
+      const remainingMs = SAMPLE_COOLDOWN_MS - elapsed;
+      const remainingMin = Math.ceil(remainingMs / 60_000);
+      return {
+        ok: false,
+        error: `Aguarde ${remainingMin} minuto${remainingMin > 1 ? 's' : ''} antes de gerar outro email`,
+        cooldownRemainingMs: remainingMs,
+      };
+    }
+  }
 
   const profile: Profile = {
     area: profileRow.area,

@@ -68,7 +68,7 @@ export default async function SettingsPage({
         </div>
       )}
 
-      <SampleCard userEmail={user.email ?? ''} />
+      <SampleCard userEmail={user.email ?? ''} lastDeliveredAt={profile.last_delivered_at} />
 
       <SettingsForm initial={initial} isActive={profile.is_active} />
     </main>

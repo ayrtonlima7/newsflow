@@ -2,6 +2,10 @@ import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { signOut } from '@/app/login/actions';
 import { SettingsForm } from './settings-form';
+import { SampleCard } from './sample-card';
+
+// O pipeline (curate + email + send) pode levar ~60s. Server actions desta rota herdam.
+export const maxDuration = 60;
 
 export default async function SettingsPage({
   searchParams,
@@ -59,9 +63,12 @@ export default async function SettingsPage({
 
       {welcome && (
         <div className="rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
-          ✓ Perfil salvo! O primeiro email vai chegar no horário e frequência que você escolheu.
+          ✓ Perfil salvo! O primeiro email vai chegar no horário e frequência que você escolheu —
+          ou clique abaixo pra receber um exemplo agora.
         </div>
       )}
+
+      <SampleCard userEmail={user.email ?? ''} />
 
       <SettingsForm initial={initial} isActive={profile.is_active} />
     </main>

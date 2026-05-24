@@ -115,12 +115,20 @@ export async function runDeliveryPipeline(
     if (!from) throw new Error('RESEND_FROM ausente');
 
     const to = opts.overrideTo ?? process.env.RESEND_OVERRIDE_TO ?? input.email;
+    const unsubscribeUrl = `${base}/api/unsubscribe?id=${deliveryId}`;
     const resend = new Resend(resendKey);
     const { data: sendData, error: sendErr } = await resend.emails.send({
       from,
       to,
       subject: email.assunto,
       html,
+      headers: {
+        // RFC 2369 / RFC 8058: ajudam Gmail/Outlook a categorizar como lista
+        // legítima (em vez de "Promoções") e habilitam o botão nativo de
+        // cancelar no cliente de email.
+        'List-Unsubscribe': `<${unsubscribeUrl}>`,
+        'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
+      },
     });
     if (sendErr) throw new Error(`Resend: ${JSON.stringify(sendErr)}`);
 

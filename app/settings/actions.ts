@@ -3,6 +3,8 @@
 import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
 import { normalizeTopics } from '@/src/lib/topic-normalization';
+import { runDeliveryPipeline } from '@/src/lib/delivery';
+import type { Profile } from '@/src/lib/types';
 
 export interface ProfileUpdateInput {
   area: string;
@@ -61,6 +63,76 @@ export async function updateProfile(
 
   revalidatePath('/settings');
   return { ok: true };
+}
+
+export interface SampleResult {
+  ok: boolean;
+  error?: string;
+  itemsCount?: number;
+  costBrl?: number;
+  elapsedSeconds?: number;
+  status?: string;
+}
+
+export async function sendSampleNow(): Promise<SampleResult> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user?.email) return { ok: false, error: 'não autenticado' };
+
+  const { data: profileRow, error } = await supabase
+    .from('profiles')
+    .select('*')
+    .eq('user_id', user.id)
+    .maybeSingle();
+  if (error) return { ok: false, error: error.message };
+  if (!profileRow) return { ok: false, error: 'perfil não encontrado' };
+
+  const profile: Profile = {
+    area: profileRow.area,
+    cargo: profileRow.cargo,
+    topicos: profileRow.topicos,
+    topicos_busca: profileRow.topicos_busca ?? undefined,
+    ignorar: profileRow.ignorar,
+    frequencia: profileRow.frequencia,
+    horario: profileRow.horario,
+    tom: profileRow.tom,
+    fontes_prioritarias: profileRow.fontes_prioritarias,
+    descricoes_livres: profileRow.descricoes_livres ?? {},
+  };
+
+  const result = await runDeliveryPipeline(
+    { userId: user.id, email: user.email, profile },
+    { dryRun: false },
+  );
+
+  if (result.status === 'failed') {
+    return {
+      ok: false,
+      error: result.error ?? 'erro desconhecido',
+      status: result.status,
+      costBrl: result.costBrl,
+      elapsedSeconds: result.elapsedSeconds,
+    };
+  }
+  if (result.status === 'skipped_empty') {
+    return {
+      ok: false,
+      error:
+        'a curadoria não retornou conteúdo verificável agora — tente de novo em alguns minutos',
+      status: result.status,
+      costBrl: result.costBrl,
+      elapsedSeconds: result.elapsedSeconds,
+    };
+  }
+  return {
+    ok: true,
+    itemsCount: result.itemsCount,
+    status: result.status,
+    costBrl: result.costBrl,
+    elapsedSeconds: result.elapsedSeconds,
+  };
 }
 
 export async function setActive(

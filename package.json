@@ -14,6 +14,7 @@
     "send-test": "tsx src/cli/send-test.ts",
     "deliver": "tsx src/cli/deliver.ts",
     "preview": "tsx src/cli/preview.ts",
+    "reset-users": "tsx src/cli/reset-users.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

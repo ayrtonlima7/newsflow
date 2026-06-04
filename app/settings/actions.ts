@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/server';
 import { normalizeTopics } from '@/src/lib/topic-normalization';
 import { runDeliveryPipeline } from '@/src/lib/delivery';
 import type { Profile } from '@/src/lib/types';
+import { SAMPLE_COOLDOWN_MS } from './constants';
 
 export interface ProfileUpdateInput {
   nome: string;
@@ -91,9 +92,9 @@ export interface SampleResult {
   elapsedSeconds?: number;
   status?: string;
   cooldownRemainingMs?: number;
+  /** Para preview inline em dev. */
+  deliveryId?: string;
 }
-
-export const SAMPLE_COOLDOWN_MS = 5 * 60 * 1000;
 
 export async function sendSampleNow(): Promise<SampleResult> {
   const supabase = await createClient();
@@ -169,6 +170,7 @@ export async function sendSampleNow(): Promise<SampleResult> {
     status: result.status,
     costBrl: result.costBrl,
     elapsedSeconds: result.elapsedSeconds,
+    deliveryId: result.deliveryId ?? undefined,
   };
 }
 

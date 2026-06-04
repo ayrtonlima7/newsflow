@@ -7,14 +7,19 @@ import { createAdminClient } from '@/lib/supabase/admin';
 
 export type LoginState =
   | { status: 'idle' }
-  | { status: 'sent'; email: string; devLink?: string }
+  | { status: 'sent'; email: string }
   | { status: 'error'; message: string };
 
 /**
- * Indica se estamos em modo dev — onde o magic link é gerado via admin
- * e devolvido pro client em vez de mandar email. Permite testar sem depender
- * de entrega de email. Em produção (NODE_ENV !== 'development'), a flag fica
- * sempre falsa.
+ * Em modo dev, em vez de mandar magic link por email, o servidor:
+ *   1. Cria o usuário se não existir
+ *   2. Gera o link via admin
+ *   3. Segue o link internamente e extrai os tokens
+ *   4. Cria a sessão via SSR client (cookies)
+ *   5. Redireciona pra onboarding/settings
+ *
+ * Resultado: usuário digita email, clica "Enviar", e tá logado.
+ * Sem precisar abrir email, sem precisar clicar em link.
  */
 const IS_DEV_AUTH_MOCK = process.env.NODE_ENV === 'development';
 
@@ -36,29 +41,29 @@ export async function requestMagicLink(
   const redirectTo = `${origin}/auth/confirm?next=${encodeURIComponent(next)}`;
 
   // =====================================================================
-  // DEV: gera link via admin e devolve pro client (sem enviar email)
+  // DEV: bypass total — auto-login server-side
   // =====================================================================
   if (IS_DEV_AUTH_MOCK) {
+    let accessToken: string | null = null;
+    let refreshToken: string | null = null;
+
     try {
       const admin = createAdminClient();
 
-      // Garante que o usuário existe (admin.generateLink type=magiclink só
-      // funciona pra usuários já existentes)
+      // 1. Garante que o usuário existe
       const { data: list } = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 });
-      const exists = list?.users.some(
-        (u) => u.email?.toLowerCase() === email,
-      );
+      const exists = list?.users.some((u) => u.email?.toLowerCase() === email);
       if (!exists) {
         const { error: createErr } = await admin.auth.admin.createUser({
           email,
-          email_confirm: true, // marca como confirmado pra pular verificação extra
+          email_confirm: true,
         });
         if (createErr) {
           return { status: 'error', message: `[dev] createUser: ${createErr.message}` };
         }
       }
 
-      // Gera o magic link
+      // 2. Gera o magic link
       const { data, error } = await admin.auth.admin.generateLink({
         type: 'magiclink',
         email,
@@ -67,16 +72,48 @@ export async function requestMagicLink(
       if (error) {
         return { status: 'error', message: `[dev] generateLink: ${error.message}` };
       }
-      const devLink = data?.properties?.action_link;
-      if (!devLink) {
-        return { status: 'error', message: '[dev] magic link não veio na resposta' };
+      const actionLink = data?.properties?.action_link;
+      if (!actionLink) {
+        return { status: 'error', message: '[dev] action_link ausente' };
       }
 
-      return { status: 'sent', email, devLink };
+      // 3. Segue o link internamente (não redireciona o browser)
+      const verifyRes = await fetch(actionLink, { redirect: 'manual' });
+      const location = verifyRes.headers.get('location');
+      if (!location) {
+        return { status: 'error', message: '[dev] sem Location no verify' };
+      }
+
+      // 4. Tokens vêm no fragment da URL de redirect
+      const hashIndex = location.indexOf('#');
+      if (hashIndex === -1) {
+        return { status: 'error', message: '[dev] sem fragmento de tokens na URL' };
+      }
+      const params = new URLSearchParams(location.slice(hashIndex + 1));
+      accessToken = params.get('access_token');
+      refreshToken = params.get('refresh_token');
+
+      if (!accessToken || !refreshToken) {
+        return { status: 'error', message: '[dev] tokens ausentes no fragmento' };
+      }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      return { status: 'error', message: `[dev] erro: ${msg}` };
+      return { status: 'error', message: `[dev] erro inesperado: ${msg}` };
     }
+
+    // 5. Cria a sessão via SSR client (seta os cookies httpOnly)
+    const supabase = await createClient();
+    const { error: sessionErr } = await supabase.auth.setSession({
+      access_token: accessToken,
+      refresh_token: refreshToken,
+    });
+    if (sessionErr) {
+      return { status: 'error', message: `[dev] setSession: ${sessionErr.message}` };
+    }
+
+    // 6. Redirect — Next.js manda o browser pra essa rota
+    //    (fora do try/catch porque redirect() throws e Next precisa rethrow)
+    redirect(next as never);
   }
 
   // =====================================================================

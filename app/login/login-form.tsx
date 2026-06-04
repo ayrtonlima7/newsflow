@@ -4,42 +4,14 @@ import { useActionState } from 'react';
 import { requestMagicLink, type LoginState } from './actions';
 
 const initial: LoginState = { status: 'idle' };
+const IS_DEV = process.env.NODE_ENV === 'development';
 
 export function LoginForm({ next }: { next?: string }) {
   const [state, formAction, pending] = useActionState(requestMagicLink, initial);
 
+  // Em prod: depois do submit, mostra "Link mágico a caminho"
+  // Em dev: nunca chega aqui (redirect direto pro next)
   if (state.status === 'sent') {
-    // Modo dev: link direto, sem precisar abrir email
-    if (state.devLink) {
-      return (
-        <div className="rounded-lg border-2 border-amber-300 bg-amber-50 p-6 space-y-4">
-          <div className="space-y-1">
-            <p className="text-xs font-medium uppercase tracking-wider text-amber-700">
-              ⚙️ Modo dev — bypass de email
-            </p>
-            <h2 className="text-lg font-medium text-stone-900">Link mágico gerado</h2>
-            <p className="text-sm text-stone-700">
-              Pra <span className="font-medium">{state.email}</span>. Em produção, esse link
-              viria por email. Aqui em local, clica abaixo pra entrar:
-            </p>
-          </div>
-          <a
-            href={state.devLink}
-            className="block w-full rounded-md bg-[var(--color-fg)] px-6 py-3 text-center text-sm font-medium text-white transition hover:opacity-90"
-          >
-            Entrar agora →
-          </a>
-          <details className="text-xs text-stone-600">
-            <summary className="cursor-pointer">Ver URL completa</summary>
-            <code className="mt-2 block break-all rounded bg-stone-100 p-2 text-[10px]">
-              {state.devLink}
-            </code>
-          </details>
-        </div>
-      );
-    }
-
-    // Modo prod: mensagem padrão de "verifique seu email"
     return (
       <div className="rounded-lg border border-[var(--color-border)] bg-white p-6 space-y-3">
         <p className="text-2xl">📬</p>
@@ -59,6 +31,14 @@ export function LoginForm({ next }: { next?: string }) {
   return (
     <form action={formAction} className="space-y-4">
       <input type="hidden" name="next" value={next ?? '/onboarding'} />
+
+      {IS_DEV && (
+        <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+          ⚙️ <strong>Modo dev:</strong> ao clicar abaixo, você será logado direto, sem
+          precisar abrir email.
+        </div>
+      )}
+
       <div className="space-y-1.5">
         <label htmlFor="email" className="text-sm font-medium">
           Email
@@ -81,7 +61,7 @@ export function LoginForm({ next }: { next?: string }) {
         disabled={pending}
         className="w-full rounded-md bg-[var(--color-accent)] px-6 py-3 text-sm font-medium text-[var(--color-accent-fg)] transition hover:opacity-90 disabled:opacity-50"
       >
-        {pending ? 'Enviando…' : 'Enviar link mágico'}
+        {pending ? (IS_DEV ? 'Entrando…' : 'Enviando…') : IS_DEV ? 'Entrar (dev)' : 'Enviar link mágico'}
       </button>
     </form>
   );

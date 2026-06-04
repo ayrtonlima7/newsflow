@@ -26,8 +26,15 @@ INSTRUÇÕES:
 - Comece com uma linha de contexto curta (o que está acontecendo no mundo
   relevante pra essa pessoa hoje). Se há nome, é um bom momento de usar.
 - Para cada item do briefing, escreva:
-  * Um título clicável (link <a href> pra fonte) — pra quem quiser se aprofundar,
-    mas tratando o clique como opcional
+  * O TÍTULO E LINK seguem regras de acordo com o campo "urlStatus" do item:
+    - urlStatus = "verified" (ou ausente): título como link clicável normal: <a href="URL">Título</a>
+    - urlStatus = "fallback": título como link clicável MAS adicione um aviso curto em itálico
+      logo após o título (mesma linha ou próxima): <em style="color:#78716c;font-size:0.85em">
+      (link da matéria específica indisponível — esse leva à seção mais ampla da fonte)</em>
+    - urlStatus = "source-only": NÃO use link clicável. Mostre o título como texto comum
+      (sem <a>). Logo após, adicione: <em style="color:#78716c;font-size:0.85em">
+      (via <strong>NOME-DA-FONTE</strong> — link específico não confirmado, busque o título
+      no site da fonte se quiser ler na íntegra)</em>
   * Um corpo de 6 a 10 linhas calibrado pelo contexto/objetivo do usuário,
     expandindo o resumo do briefing com TODOS os detalhes cruciais: números,
     nomes, datas, contexto, implicações. O leitor deve entender o assunto

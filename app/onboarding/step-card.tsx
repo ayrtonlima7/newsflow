@@ -70,15 +70,8 @@ export function StepCard({ question, value, onChange, loading, dynamicChips }: P
         />
       )}
 
-      {/* Caso 2: LOADING (LLM gerando sugestões) */}
-      {!question.multiline && loading && (
-        <div className="rounded-md bg-white border border-[var(--color-border)] p-6 text-sm text-[var(--color-muted)]">
-          ✨ Gerando sugestões personalizadas para você…
-        </div>
-      )}
-
-      {/* Caso 3: SINGLE + SEM CHIPS (nome) — input bindado direto */}
-      {!question.multiline && !loading && isSingleFreeText && (
+      {/* Caso 2: SINGLE + SEM CHIPS (nome) — input bindado direto */}
+      {!question.multiline && isSingleFreeText && (
         <input
           type="text"
           value={typeof value === 'string' ? value : ''}
@@ -88,8 +81,9 @@ export function StepCard({ question, value, onChange, loading, dynamicChips }: P
         />
       )}
 
-      {/* Caso 4: INPUT FIRST (topicos, referencias — Variação B) */}
-      {!question.multiline && !loading && !isSingleFreeText && question.inputFirst && (
+      {/* Caso 3: INPUT FIRST (topicos, referencias — Variação B).
+          Loading inline: input fica ativo, sugestões mostram skeleton. */}
+      {!question.multiline && !isSingleFreeText && question.inputFirst && (
         <InputFirstLayout
           question={question}
           value={value}
@@ -100,7 +94,15 @@ export function StepCard({ question, value, onChange, loading, dynamicChips }: P
           addFreeText={addFreeText}
           toggleChip={toggleChip}
           onClearSingle={() => onChange('')}
+          loading={loading}
         />
+      )}
+
+      {/* Caso 4: LOADING genérico (não inputFirst, mas dinâmico) */}
+      {!question.multiline && !isSingleFreeText && !question.inputFirst && loading && (
+        <div className="rounded-md bg-white border border-[var(--color-border)] p-6 text-sm text-[var(--color-muted)]">
+          ✨ Gerando sugestões personalizadas para você…
+        </div>
       )}
 
       {/* Caso 5: CHIPS-FIRST (tema, contexto, objetivo, formatos, ignorar, frequencia) */}
@@ -226,7 +228,8 @@ function ChipsFirstLayout({
 }
 
 /** Variação B: input livre em destaque, chips abaixo como sugestões discretas.
- *  Suporta também single (com pill custom removível) e multi (com pills removíveis). */
+ *  Suporta também single (com pill custom removível), multi (com pills removíveis),
+ *  e loading state inline (mostra spinner no lugar das sugestões). */
 function InputFirstLayout({
   question,
   value,
@@ -237,6 +240,7 @@ function InputFirstLayout({
   addFreeText,
   toggleChip,
   onClearSingle,
+  loading,
 }: {
   question: Question;
   value: string | string[];
@@ -247,6 +251,7 @@ function InputFirstLayout({
   addFreeText: () => void;
   toggleChip: (chip: string) => void;
   onClearSingle: () => void;
+  loading?: boolean;
 }) {
   const selected = isMulti ? (Array.isArray(value) ? value : []) : [];
   const singleVal = !isMulti && typeof value === 'string' && value ? value : null;
@@ -256,7 +261,7 @@ function InputFirstLayout({
 
   return (
     <div className="space-y-4">
-      {/* Input principal — protagonista */}
+      {/* Input principal — protagonista. Continua disponível mesmo durante loading. */}
       <div className="flex gap-2">
         <input
           type="text"
@@ -310,8 +315,31 @@ function InputFirstLayout({
         </div>
       )}
 
-      {/* Sugestões discretas, com prefixo "+" */}
-      {remainingChips.length > 0 && (
+      {/* Loading inline pras sugestões (a IA tá pensando). Input fica ativo. */}
+      {loading && (
+        <div className="space-y-2 pt-2">
+          <div className="flex items-center gap-2 text-sm text-[var(--color-muted)]">
+            <SpinnerIcon />
+            <span>
+              ✨ Combinando suas respostas e buscando sugestões pra você… (pode levar
+              ~15s)
+            </span>
+          </div>
+          {/* Skeleton pills pra dar peso visual durante o load */}
+          <div className="flex flex-wrap gap-1.5">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <span
+                key={i}
+                className="h-7 w-24 animate-pulse rounded-full bg-stone-200"
+                style={{ width: `${60 + ((i * 17) % 60)}px` }}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Sugestões discretas, com prefixo "+" (só quando não tá carregando) */}
+      {!loading && remainingChips.length > 0 && (
         <div className="space-y-2 pt-2">
           <p className="text-xs text-[var(--color-muted)]">
             Sem ideias? Aqui vão sugestões pra você:
@@ -331,5 +359,31 @@ function InputFirstLayout({
         </div>
       )}
     </div>
+  );
+}
+
+function SpinnerIcon() {
+  return (
+    <svg
+      className="h-4 w-4 animate-spin text-[var(--color-muted)]"
+      xmlns="http://www.w3.org/2000/svg"
+      fill="none"
+      viewBox="0 0 24 24"
+      aria-hidden
+    >
+      <circle
+        className="opacity-25"
+        cx="12"
+        cy="12"
+        r="10"
+        stroke="currentColor"
+        strokeWidth="4"
+      />
+      <path
+        className="opacity-75"
+        fill="currentColor"
+        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+      />
+    </svg>
   );
 }

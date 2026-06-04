@@ -103,13 +103,16 @@ export function OnboardingWizard({ userEmail }: { userEmail: string }) {
     const nextVisible = findNextVisible(step + 1, answers);
     const nextQuestion = nextVisible !== null ? questions[nextVisible] : null;
 
-    // Trigger LLM topic suggestions ANTES de mostrar a pergunta `topicos`
+    // Pra pergunta dinâmica (topicos), TRANSITA primeiro e dispara LLM em
+    // paralelo. Assim o usuário vê a tela nova com loading inline em vez de
+    // ficar parado no botão travado.
     if (
       nextQuestion?.id === 'topicos' &&
       nextQuestion.type === 'multi' &&
       nextQuestion.dynamic &&
       dynamicTopics.length === 0
     ) {
+      setStep(nextVisible!);
       setLoadingTopics(true);
       setTopicsError(null);
       startTransition(async () => {
@@ -126,7 +129,6 @@ export function OnboardingWizard({ userEmail }: { userEmail: string }) {
         if (error) setTopicsError(error);
         setDynamicTopics(topics);
         setLoadingTopics(false);
-        setStep(nextVisible!);
       });
       return;
     }

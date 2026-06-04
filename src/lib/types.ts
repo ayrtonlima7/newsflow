@@ -38,10 +38,19 @@ export interface Profile {
 
 export type Relevancia = 'Alta' | 'Média';
 
+export type UrlStatus = 'verified' | 'fallback' | 'source-only';
+
 export interface BriefingItem {
   titulo: string;
   fonte: string;
+  /** URL final usada — pode ser a original (verified), parent (fallback) ou origem (source-only). */
   url: string;
+  /** Status de verificação. Email gen usa pra decidir como renderizar o link. */
+  urlStatus?: UrlStatus;
+  /** Quando urlStatus !== 'verified', guarda a URL original que o modelo gerou (pra debug/log). */
+  urlOriginal?: string;
+  /** Data de publicação do conteúdo no formato YYYY-MM-DD. Obrigatório pro filtro de frescor. */
+  data_publicacao: string;
   relevancia: Relevancia;
   motivo_relevancia: string;
   resumo: string;
@@ -57,10 +66,36 @@ export interface EmailOutput {
   html: string;
 }
 
-export function frequenciaParaJanela(frequencia: string): { dias: number; rotulo: string } {
+export interface JanelaFrescor {
+  /** Janela em dias. Conteúdo mais antigo que isso é REJEITADO. Casa exatamente
+   *  com a cadência de entrega: diária → 1, semanal → 7. */
+  janelaDias: number;
+  /** Texto pro prompt descrevendo a janela. */
+  rotulo: string;
+  /** Hoje no formato YYYY-MM-DD. */
+  todayISO: string;
+  /** Data limite em YYYY-MM-DD — tudo publicado antes disso é rejeitado. */
+  cutoffISO: string;
+}
+
+export function frequenciaParaJanela(frequencia: string): JanelaFrescor {
+  const today = new Date();
+  const todayISO = today.toISOString().split('T')[0];
+
   const f = frequencia.toLowerCase();
-  if (f.includes('semana')) return { dias: 7, rotulo: 'últimos 7 dias' };
-  return { dias: 1, rotulo: 'últimas 24 horas' };
+  // Janela = cadência de entrega. Se o usuário recebe semanal, o gap útil é 7 dias.
+  // Se recebe diário, é 1 dia. Sem padding com conteúdo velho.
+  const janelaDias = f.includes('semana') ? 7 : 1;
+
+  const cutoff = new Date(today.getTime() - janelaDias * 24 * 60 * 60 * 1000);
+  const cutoffISO = cutoff.toISOString().split('T')[0];
+
+  return {
+    janelaDias,
+    rotulo: janelaDias === 1 ? 'últimas 24 horas' : `últimos ${janelaDias} dias`,
+    todayISO,
+    cutoffISO,
+  };
 }
 
 /**

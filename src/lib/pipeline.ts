@@ -2,8 +2,9 @@ import { getProvider, extractJson } from './providers';
 import { buildCuratePrompt, buildRetryCuratePrompt } from '../prompts/curate';
 import { buildEmailPrompt } from '../prompts/email';
 import { calculateCost } from './pricing';
-import { validateBriefingUrls, type DroppedItem } from './url-validation';
-import type { Profile, Briefing, EmailOutput } from './types';
+import { validateBriefingUrls, type DroppedItem, type DegradedItem } from './url-validation';
+import type { Profile, Briefing, BriefingItem, EmailOutput } from './types';
+import { frequenciaParaJanela } from './types';
 
 const MIN_VALID_ITEMS = 3;
 const TARGET_MIN = 4;
@@ -25,6 +26,7 @@ export interface PipelineMeta {
   cost: ReturnType<typeof calculateCost>;
   citations?: { url: string; title?: string }[];
   droppedItems?: DroppedItem[];
+  degradedItems?: DegradedItem[];
   retryRan?: boolean;
 }
 
@@ -51,7 +53,23 @@ export async function generateBriefing(
   }
   const briefing = extractJson<Briefing>(result.text);
 
-  const { validItems, droppedItems } = await validateBriefingUrls(briefing.itens);
+  // Primeiro filtro: frescor. Descarta itens fora da janela de tempo OU sem data
+  // (antes mesmo de validar URLs — não vale gastar requests HTTP em conteúdo velho).
+  const janela = frequenciaParaJanela(profile.frequencia);
+  const {
+    freshItems,
+    staleDropped,
+  } = filterByFreshness(briefing.itens, janela.cutoffISO);
+  if (staleDropped.length > 0) {
+    console.warn(
+      `[curate] ${staleDropped.length}/${briefing.itens.length} item(s) descartado(s) por frescor (cutoff: ${janela.cutoffISO}):`,
+    );
+    for (const d of staleDropped) {
+      console.warn(`  - "${d.item.titulo}" → ${d.reason} (data: ${d.item.data_publicacao || 'AUSENTE'})`);
+    }
+  }
+
+  const { validItems, droppedItems, degradedItems } = await validateBriefingUrls(freshItems);
   if (droppedItems.length > 0) {
     console.warn(
       `[curate] ${droppedItems.length}/${briefing.itens.length} item(s) descartado(s) por URL inválida:`,
@@ -60,10 +78,21 @@ export async function generateBriefing(
       console.warn(`  - "${d.item.titulo}" → ${d.reason} (${d.item.url})`);
     }
   }
+  if (degradedItems.length > 0) {
+    console.warn(
+      `[curate] ${degradedItems.length}/${briefing.itens.length} item(s) com URL degradada (fallback/source-only):`,
+    );
+    for (const d of degradedItems) {
+      console.warn(
+        `  ~ "${d.item.titulo}" → status=${d.item.urlStatus} | ${d.reason} | usando ${d.item.url}`,
+      );
+    }
+  }
 
   // Aggregate accumulators (cost/usage somam retry; itens são merge)
   const accValid: typeof validItems = [...validItems];
-  const accDropped: typeof droppedItems = [...droppedItems];
+  const accDropped: typeof droppedItems = [...staleDropped, ...droppedItems];
+  const accDegraded: typeof degradedItems = [...degradedItems];
   let accUsage = { ...result.usage };
   let accElapsedSeconds = elapsedSeconds;
   let retryRan = false;
@@ -78,6 +107,7 @@ export async function generateBriefing(
     if (retryResult) {
       accValid.push(...retryResult.newValidItems);
       accDropped.push(...retryResult.newDroppedItems);
+      accDegraded.push(...retryResult.newDegradedItems);
       accUsage = sumUsage(accUsage, retryResult.usage);
       accElapsedSeconds += retryResult.elapsedSeconds;
       console.warn(
@@ -101,9 +131,47 @@ export async function generateBriefing(
       cost,
       citations: result.citations,
       droppedItems: accDropped,
+      ...(accDegraded.length > 0 ? { degradedItems: accDegraded } : {}),
       ...(retryRan ? { retryRan: true } : {}),
     },
   };
+}
+
+/**
+ * Filtra itens por frescor — descarta os que estão fora da janela ou sem data.
+ * Roda ANTES da validação de URL (não vale gastar requests HTTP em conteúdo velho).
+ *
+ * Critérios pra descarte:
+ *   - data_publicacao ausente ou inválida
+ *   - data_publicacao < cutoffISO (mais antiga que o limite máximo)
+ */
+function filterByFreshness(
+  items: BriefingItem[],
+  cutoffISO: string,
+): { freshItems: BriefingItem[]; staleDropped: DroppedItem[] } {
+  const freshItems: BriefingItem[] = [];
+  const staleDropped: DroppedItem[] = [];
+
+  for (const item of items) {
+    const date = item.data_publicacao;
+    if (!date || typeof date !== 'string') {
+      staleDropped.push({ item, reason: 'sem data_publicacao' });
+      continue;
+    }
+    // Validação básica de formato YYYY-MM-DD (não checagem rigorosa)
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      staleDropped.push({ item, reason: `data inválida: "${date}"` });
+      continue;
+    }
+    // Comparação ISO string funciona porque YYYY-MM-DD ordena corretamente
+    if (date < cutoffISO) {
+      staleDropped.push({ item, reason: `antigo (publicado em ${date}, cutoff ${cutoffISO})` });
+      continue;
+    }
+    freshItems.push(item);
+  }
+
+  return { freshItems, staleDropped };
 }
 
 function sumUsage(a: PipelineUsage, b: PipelineUsage): PipelineUsage {
@@ -123,6 +191,7 @@ async function retryCurate(
 ): Promise<{
   newValidItems: Briefing['itens'];
   newDroppedItems: DroppedItem[];
+  newDegradedItems: DegradedItem[];
   usage: PipelineUsage;
   elapsedSeconds: number;
 } | null> {
@@ -151,7 +220,13 @@ async function retryCurate(
 
   if (!result.text.trim()) {
     console.warn('[curate.retry] resposta vazia');
-    return { newValidItems: [], newDroppedItems: [], usage: result.usage, elapsedSeconds };
+    return {
+      newValidItems: [],
+      newDroppedItems: [],
+      newDegradedItems: [],
+      usage: result.usage,
+      elapsedSeconds,
+    };
   }
 
   let retryBriefing: Briefing;
@@ -159,10 +234,16 @@ async function retryCurate(
     retryBriefing = extractJson<Briefing>(result.text);
   } catch (err) {
     console.warn('[curate.retry] falha ao parsear JSON:', err);
-    return { newValidItems: [], newDroppedItems: [], usage: result.usage, elapsedSeconds };
+    return {
+      newValidItems: [],
+      newDroppedItems: [],
+      newDegradedItems: [],
+      usage: result.usage,
+      elapsedSeconds,
+    };
   }
 
-  // Filtra URLs já presentes no primeiro pass (válidas ou descartadas) — modelo pode ter ignorado instrução
+  // Filtra URLs já presentes no primeiro pass (válidas ou descartadas)
   const seen = new Set<string>([
     ...validItems.map((v) => v.url),
     ...droppedItems.map((d) => d.item.url),
@@ -174,18 +255,41 @@ async function retryCurate(
     );
   }
 
-  const { validItems: retryValid, droppedItems: retryDropped } =
-    await validateBriefingUrls(candidates);
+  // Filtro de frescor no retry também
+  const retryJanela = frequenciaParaJanela(profile.frequencia);
+  const { freshItems: retryFresh, staleDropped: retryStale } = filterByFreshness(
+    candidates,
+    retryJanela.cutoffISO,
+  );
+  if (retryStale.length > 0) {
+    console.warn(`[curate.retry] ${retryStale.length} item(s) descartado(s) por frescor:`);
+    for (const d of retryStale) {
+      console.warn(`  - "${d.item.titulo}" → ${d.reason}`);
+    }
+  }
+
+  const {
+    validItems: retryValid,
+    droppedItems: retryDropped,
+    degradedItems: retryDegraded,
+  } = await validateBriefingUrls(retryFresh);
   if (retryDropped.length > 0) {
     console.warn(`[curate.retry] validação derrubou ${retryDropped.length}/${candidates.length}:`);
     for (const d of retryDropped) {
       console.warn(`  - "${d.item.titulo}" → ${d.reason}`);
     }
   }
+  if (retryDegraded.length > 0) {
+    console.warn(`[curate.retry] ${retryDegraded.length} item(s) degradado(s) no retry:`);
+    for (const d of retryDegraded) {
+      console.warn(`  ~ "${d.item.titulo}" → status=${d.item.urlStatus}`);
+    }
+  }
 
   return {
     newValidItems: retryValid,
-    newDroppedItems: retryDropped,
+    newDroppedItems: [...retryStale, ...retryDropped],
+    newDegradedItems: retryDegraded,
     usage: result.usage,
     elapsedSeconds,
   };

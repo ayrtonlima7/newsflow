@@ -9,15 +9,33 @@ export interface RetryContext {
 }
 
 export function buildCuratePrompt(profile: Profile): { system: string; user: string } {
-  const { rotulo } = frequenciaParaJanela(profile.frequencia);
+  const janela = frequenciaParaJanela(profile.frequencia);
 
   const system =
     'Você é um agente de curadoria de conteúdo profissional. ' +
     'Você recebe o perfil de um usuário e sua tarefa é pesquisar, filtrar e selecionar ' +
-    `os conteúdos mais relevantes publicados nas ${rotulo}.`;
+    `os conteúdos mais NOVOS e RELEVANTES — publicados nos ${janela.rotulo}. ` +
+    'Frescor é tão importante quanto relevância — o usuário quer notícias atuais, não enciclopédia.';
 
   const user = `PERFIL DO USUÁRIO:
 ${JSON.stringify(profileForPrompt(profile), null, 2)}
+
+DATA ATUAL: ${janela.todayISO}
+JANELA DE FRESCOR: ${janela.rotulo}
+  - Cadência de entrega do usuário: ${profile.frequencia}
+  - Cutoff: artigos publicados antes de ${janela.cutoffISO} são REJEITADOS
+
+REGRA CRÍTICA DE FRESCOR (a mais importante):
+- A janela é EXATA, espelha a cadência de entrega. Se o usuário recebe semanalmente, ele só
+  quer notícias dos últimos 7 dias. Se recebe diariamente, dos últimos 1 dia.
+- Conteúdo anterior ao cutoff já foi visto na entrega passada — ou é velho demais pra importar.
+- O usuário quer NOTÍCIAS frescas, não enciclopédia. Conteúdo evergreen (tutoriais antigos,
+  posts atemporais, biografias, "como funciona X") está FORA — esse não é o produto.
+- Se a URL contém data antiga (ex: /2024/03/15/, /2022/, /noticias/jan-2023/), DESCARTE
+  imediatamente — sinal forte de artigo velho.
+- Sem data de publicação confirmada = DESCARTE. Não tem como garantir frescor sem data.
+- NUNCA inclua artigos antes de ${janela.cutoffISO}, mesmo que pareçam super relevantes. Trate
+  como spam — é melhor email mais enxuto com 2 itens FRESCOS do que 6 itens com metade velhos.
 
 INSTRUÇÕES:
 - Pesquise nas referências do usuário (campo "referencias") e nas fontes convencionais
@@ -89,12 +107,13 @@ REGRAS CRÍTICAS SOBRE URLS:
 
 RESPONDA APENAS COM UM JSON VÁLIDO, sem markdown, sem texto antes ou depois:
 {
-  "data_referencia": "YYYY-MM-DD",
+  "data_referencia": "${janela.todayISO}",
   "itens": [
     {
       "titulo": "",
       "fonte": "",
       "url": "",
+      "data_publicacao": "YYYY-MM-DD (entre ${janela.cutoffISO} e ${janela.todayISO}, OBRIGATÓRIO)",
       "relevancia": "Alta",
       "motivo_relevancia": "",
       "resumo": ""
@@ -109,12 +128,12 @@ export function buildRetryCuratePrompt(
   profile: Profile,
   ctx: RetryContext,
 ): { system: string; user: string } {
-  const { rotulo } = frequenciaParaJanela(profile.frequencia);
+  const janela = frequenciaParaJanela(profile.frequencia);
 
   const system =
     'Você é um agente de curadoria de conteúdo profissional executando uma SEGUNDA tentativa. ' +
     'Uma rodada anterior produziu itens com URLs inválidas que foram descartadas pela validação. ' +
-    `Sua tarefa agora é encontrar conteúdos REAIS e VERIFICÁVEIS publicados nas ${rotulo}, ` +
+    `Sua tarefa agora é encontrar conteúdos REAIS, FRESCOS e VERIFICÁVEIS publicados nos ${janela.rotulo}, ` +
     'cuidando para não repetir os erros anteriores.';
 
   const brokenList = ctx.brokenItems
@@ -158,13 +177,21 @@ REGRAS CRÍTICAS DE URL (REFORÇADAS — a tentativa anterior falhou aqui):
 - Se você não encontrar URLs verificáveis suficientes, retorne MENOS itens
   do que o solicitado — é melhor 1 item real do que 4 inventados.
 
+REGRAS CRÍTICAS DE FRESCOR:
+- Data atual: ${janela.todayISO}.
+- Limite máximo de antiguidade: ${janela.cutoffISO}. NÃO inclua artigos antes disso.
+- Cada item DEVE ter campo "data_publicacao" no formato YYYY-MM-DD.
+- Se a URL contém data antiga no caminho (ex: /2023/, /noticias/abril-2024/), DESCARTE — é artigo velho.
+- Sem data confirmada = descarta.
+
 RESPONDA APENAS COM UM JSON VÁLIDO, sem markdown, sem texto antes ou depois:
 {
-  "data_referencia": "YYYY-MM-DD",
+  "data_referencia": "${janela.todayISO}",
   "itens": [ {
     "titulo": "",
     "fonte": "",
     "url": "",
+    "data_publicacao": "YYYY-MM-DD (entre ${janela.cutoffISO} e ${janela.todayISO}, OBRIGATÓRIO)",
     "relevancia": "Alta",
     "motivo_relevancia": "",
     "resumo": ""

@@ -3,6 +3,7 @@ import { buildCuratePrompt, buildRetryCuratePrompt } from '../prompts/curate';
 import { buildEmailPrompt } from '../prompts/email';
 import { calculateCost } from './pricing';
 import { validateBriefingUrls, type DroppedItem, type DegradedItem } from './url-validation';
+import { recoverUrlsFromGrounding } from './url-recovery';
 import type { Profile, Briefing, BriefingItem, EmailOutput } from './types';
 import { frequenciaParaJanela } from './types';
 
@@ -52,6 +53,26 @@ export async function generateBriefing(
     throw new Error('curate: resposta vazia do modelo (tokens esgotados em raciocínio?)');
   }
   const briefing = extractJson<Briefing>(result.text);
+
+  // Recovery: substituir URLs alucinadas pelas URLs reais das citations do grounding.
+  // Roda ANTES de todos os outros filtros — afinal, URL correta muda o resultado da validação.
+  const { recoveredItems, stats: recoveryStats } = await recoverUrlsFromGrounding(
+    briefing.itens,
+    result.citations ?? [],
+  );
+  briefing.itens = recoveredItems;
+  if (recoveryStats.recovered > 0) {
+    console.log(
+      `[curate] ${recoveryStats.recovered}/${briefing.itens.length} URL(s) recuperada(s) via grounding citations`,
+    );
+    for (const item of recoveredItems) {
+      if (item.urlOriginal) {
+        console.log(`  ↳ "${item.titulo}":`);
+        console.log(`     antes: ${item.urlOriginal}`);
+        console.log(`     agora: ${item.url}`);
+      }
+    }
+  }
 
   // Primeiro filtro: frescor. Descarta itens fora da janela de tempo OU sem data
   // (antes mesmo de validar URLs — não vale gastar requests HTTP em conteúdo velho).
@@ -243,15 +264,24 @@ async function retryCurate(
     };
   }
 
+  // Recovery via grounding citations no retry também
+  const { recoveredItems: retryRecovered, stats: retryRecoveryStats } =
+    await recoverUrlsFromGrounding(retryBriefing.itens, result.citations ?? []);
+  if (retryRecoveryStats.recovered > 0) {
+    console.log(
+      `[curate.retry] ${retryRecoveryStats.recovered} URL(s) recuperada(s) via grounding`,
+    );
+  }
+
   // Filtra URLs já presentes no primeiro pass (válidas ou descartadas)
   const seen = new Set<string>([
     ...validItems.map((v) => v.url),
     ...droppedItems.map((d) => d.item.url),
   ]);
-  const candidates = retryBriefing.itens.filter((i) => !seen.has(i.url));
-  if (candidates.length < retryBriefing.itens.length) {
+  const candidates = retryRecovered.filter((i) => !seen.has(i.url));
+  if (candidates.length < retryRecovered.length) {
     console.warn(
-      `[curate.retry] modelo retornou ${retryBriefing.itens.length - candidates.length} item(s) repetido(s) — descartados`,
+      `[curate.retry] modelo retornou ${retryRecovered.length - candidates.length} item(s) repetido(s) — descartados`,
     );
   }
 

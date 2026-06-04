@@ -3,7 +3,7 @@
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
-import { questions, type QuestionId } from '@/app/onboarding/questions';
+import { questions, isQuestionShown, type QuestionId } from '@/app/onboarding/questions';
 import { StepCard } from '@/app/onboarding/step-card';
 import { updateProfile, setActive, type ProfileUpdateInput } from './actions';
 
@@ -60,8 +60,12 @@ export function SettingsForm({ initial, isActive: initialActive }: Props) {
     });
   }
 
-  // Em /settings mostramos TODAS as perguntas (inclusive a condicional),
-  // pra o usuário editar livremente. A condicional só esconde no onboarding.
+  // Filtra perguntas condicionais — respeita o mesmo `condicional` do onboarding.
+  // Ex: se contexto != Profissão/Estudo, a descricao_livre não aparece.
+  const visibleQuestions = questions.filter((q) =>
+    isQuestionShown(q, values as Record<QuestionId, string | string[]>),
+  );
+
   return (
     <div className="space-y-8">
       <div className="flex items-center justify-between gap-4 rounded-lg border border-[var(--color-border)] bg-white p-5">
@@ -90,7 +94,7 @@ export function SettingsForm({ initial, isActive: initialActive }: Props) {
         </button>
       </div>
 
-      {questions.map((q) => {
+      {visibleQuestions.map((q) => {
         const id = q.id as QuestionId;
         return (
           <div

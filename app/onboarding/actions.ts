@@ -12,6 +12,9 @@ export interface TopicSuggestionsContext {
   contexto: string;
   descricao_livre: string;
   objetivo: string;
+  referencias: string[];
+  formatos: string[];
+  ignorar: string[];
 }
 
 export async function generateTopicSuggestions(
@@ -26,13 +29,22 @@ export async function generateTopicSuggestions(
     const system =
       'Você ajuda usuários a configurar uma curadoria de conteúdo personalizada. ' +
       'Você gera sugestões de tópicos, ferramentas, marcas e conceitos específicos relevantes ' +
-      'para o perfil informado.';
+      'para o perfil informado. Use TODAS as informações disponíveis pra gerar sugestões cirúrgicas — ' +
+      'especialmente as referências (pessoas/marcas/canais que o usuário admira), que apontam pra ' +
+      'subáreas muito específicas.';
 
     const contextLine = [
       `Tema(s) de interesse: ${ctx.tema.join(', ')}`,
       `Contexto: ${ctx.contexto || 'não informado'}`,
       ctx.descricao_livre ? `Sobre o usuário: ${ctx.descricao_livre}` : null,
       ctx.objetivo ? `Objetivo: ${ctx.objetivo}` : null,
+      ctx.referencias.length > 0
+        ? `Referências que o usuário admira/segue: ${ctx.referencias.join(', ')}`
+        : null,
+      ctx.formatos.length > 0
+        ? `Formatos preferidos de consumo: ${ctx.formatos.join(', ')}`
+        : null,
+      ctx.ignorar.length > 0 ? `Quer EVITAR: ${ctx.ignorar.join(', ')}` : null,
     ]
       .filter(Boolean)
       .join('\n');
@@ -46,6 +58,9 @@ Critérios:
 - Variados: misture técnico, mercado, tendências, ferramentas, pessoas/marcas notórias.
 - Curtos (3-10 palavras).
 - Coerentes com o contexto: se for "Hobby", evita termos hiper-corporativos; se for "Profissão", pode ir mais fundo.
+- Use as REFERÊNCIAS como sinal forte: se o usuário admira "Lex Fridman", inclua tópicos como "AI alignment", "entrevistas longas com pesquisadores"; se admira "Anthropic", inclua "Claude", "constitutional AI", "interpretabilidade". As referências apontam pras subáreas mais valiosas pro usuário.
+- Use os FORMATOS preferidos como sinal: se prefere "Vídeos/podcasts", priorize tópicos com ecossistema de áudio forte; se prefere "Estudos/papers", inclua áreas com produção acadêmica robusta.
+- EVITE qualquer sugestão que caia dentro do que o usuário disse pra evitar (Ignorar). Se ele disse "tutoriais básicos", não sugira "Aprender Python do zero".
 
 Responda APENAS com um array JSON de strings, sem markdown:
 ["tópico 1", "tópico 2", ...]`;

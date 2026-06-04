@@ -108,20 +108,6 @@ export const questions: Question[] = [
     required: true,
   },
   {
-    id: 'topicos',
-    type: 'multi',
-    question: 'Que tópicos, ferramentas, marcas ou conceitos estão no seu radar agora?',
-    helper:
-      'Quanto mais específico, melhor. Digite o que vem na cabeça e dá enter. Tem sugestões abaixo se travar.',
-    chips: [],
-    dynamic: true,
-    allowFree: true,
-    inputFirst: true,
-    minSelections: 1,
-    placeholder: 'Ex: IA generativa, maratona de 21k, restauração de móveis, bolsa americana...',
-    required: true,
-  },
-  {
     id: 'referencias',
     type: 'multi',
     question: 'Quem você admira ou já acompanha nesse tema?',
@@ -163,6 +149,20 @@ export const questions: Question[] = [
     ],
     allowFree: true,
     required: false,
+  },
+  {
+    id: 'topicos',
+    type: 'multi',
+    question: 'Pra fechar — que tópicos, ferramentas, marcas ou conceitos estão no seu radar agora?',
+    helper:
+      'Quanto mais específico, melhor. Digite o que vem na cabeça e dá enter. Tem sugestões personalizadas abaixo, baseadas em tudo que você contou até aqui.',
+    chips: [],
+    dynamic: true,
+    allowFree: true,
+    inputFirst: true,
+    minSelections: 1,
+    placeholder: 'Ex: IA generativa, maratona de 21k, restauração de móveis, bolsa americana...',
+    required: true,
   },
   {
     id: 'frequencia',

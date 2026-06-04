@@ -45,6 +45,11 @@ export function StepCard({ question, value, onChange, loading, dynamicChips }: P
     setFreeText('');
   }
 
+  // Detecta o caso "single + sem chips + texto livre" — usado pelo `nome`.
+  // Esse caso usa input bindado direto ao value (sem padrão de "adicionar pill").
+  const isSingleFreeText =
+    !isMulti && question.chips.length === 0 && question.allowFree && !question.multiline;
+
   return (
     <div className="space-y-6">
       <div className="space-y-2">
@@ -54,8 +59,8 @@ export function StepCard({ question, value, onChange, loading, dynamicChips }: P
         )}
       </div>
 
-      {/* TEXTAREA (descricao_livre) — bind direto, sem chips/free-add */}
-      {question.multiline ? (
+      {/* Caso 1: TEXTAREA (descricao_livre) */}
+      {question.multiline && (
         <textarea
           value={typeof value === 'string' ? value : ''}
           onChange={(e) => onChange(e.target.value)}
@@ -63,11 +68,28 @@ export function StepCard({ question, value, onChange, loading, dynamicChips }: P
           rows={4}
           className="w-full resize-none rounded-md border border-[var(--color-border)] bg-white px-4 py-3 text-base outline-none transition focus:border-[var(--color-fg)]"
         />
-      ) : loading ? (
+      )}
+
+      {/* Caso 2: LOADING (LLM gerando sugestões) */}
+      {!question.multiline && loading && (
         <div className="rounded-md bg-white border border-[var(--color-border)] p-6 text-sm text-[var(--color-muted)]">
           ✨ Gerando sugestões personalizadas para você…
         </div>
-      ) : question.inputFirst ? (
+      )}
+
+      {/* Caso 3: SINGLE + SEM CHIPS (nome) — input bindado direto */}
+      {!question.multiline && !loading && isSingleFreeText && (
+        <input
+          type="text"
+          value={typeof value === 'string' ? value : ''}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={question.placeholder}
+          className="w-full rounded-md border border-[var(--color-border)] bg-white px-4 py-3 text-base outline-none transition focus:border-[var(--color-fg)]"
+        />
+      )}
+
+      {/* Caso 4: INPUT FIRST (topicos, referencias — Variação B) */}
+      {!question.multiline && !loading && !isSingleFreeText && question.inputFirst && (
         <InputFirstLayout
           question={question}
           value={value}
@@ -77,19 +99,26 @@ export function StepCard({ question, value, onChange, loading, dynamicChips }: P
           setFreeText={setFreeText}
           addFreeText={addFreeText}
           toggleChip={toggleChip}
+          onClearSingle={() => onChange('')}
         />
-      ) : (
+      )}
+
+      {/* Caso 5: CHIPS-FIRST (tema, contexto, objetivo, formatos, ignorar, frequencia) */}
+      {!question.multiline && !loading && !isSingleFreeText && !question.inputFirst && (
         <ChipsFirstLayout
           value={value}
           isMulti={isMulti}
           chips={chips}
           toggleChip={toggleChip}
+          onClearSingle={() => onChange('')}
         />
       )}
 
-      {/* Free-text padrão (só pra layouts chips-first com allowFree) */}
+      {/* Free-text complementar — só pra chips-first com allowFree.
+          Casos: tema (multi), objetivo (single), ignorar (multi). */}
       {!question.multiline &&
         !question.inputFirst &&
+        !isSingleFreeText &&
         question.allowFree &&
         !loading && (
           <div className="flex gap-2">
@@ -122,18 +151,27 @@ export function StepCard({ question, value, onChange, loading, dynamicChips }: P
   );
 }
 
-/** Layout padrão: chips em destaque, free-text como complemento abaixo. */
+/** Layout padrão: chips em destaque. Mostra valor selecionado destacado e
+ *  pills customizadas (free-text fora dos chips) também destacadas. */
 function ChipsFirstLayout({
   value,
   isMulti,
   chips,
   toggleChip,
+  onClearSingle,
 }: {
   value: string | string[];
   isMulti: boolean;
   chips: string[];
   toggleChip: (chip: string) => void;
+  onClearSingle: () => void;
 }) {
+  // Pra single: valor custom (não-presente nos chips) — mostra como pill removível
+  const singleCustom =
+    !isMulti && typeof value === 'string' && value && !chips.includes(value)
+      ? value
+      : null;
+
   return (
     <div className="flex flex-wrap gap-2">
       {chips.map((chip) => {
@@ -156,6 +194,19 @@ function ChipsFirstLayout({
           </button>
         );
       })}
+
+      {/* Pill customizada pra single quando o valor não está nos chips */}
+      {singleCustom && (
+        <button
+          type="button"
+          onClick={onClearSingle}
+          className="rounded-full border border-[var(--color-fg)] bg-[var(--color-fg)] text-white px-4 py-2 text-sm transition hover:opacity-90"
+        >
+          {singleCustom} ✕
+        </button>
+      )}
+
+      {/* Pills customizadas pra multi */}
       {isMulti &&
         Array.isArray(value) &&
         value
@@ -174,7 +225,8 @@ function ChipsFirstLayout({
   );
 }
 
-/** Variação B: input livre em destaque, chips abaixo como sugestões discretas. */
+/** Variação B: input livre em destaque, chips abaixo como sugestões discretas.
+ *  Suporta também single (com pill custom removível) e multi (com pills removíveis). */
 function InputFirstLayout({
   question,
   value,
@@ -184,6 +236,7 @@ function InputFirstLayout({
   setFreeText,
   addFreeText,
   toggleChip,
+  onClearSingle,
 }: {
   question: Question;
   value: string | string[];
@@ -193,9 +246,13 @@ function InputFirstLayout({
   setFreeText: (s: string) => void;
   addFreeText: () => void;
   toggleChip: (chip: string) => void;
+  onClearSingle: () => void;
 }) {
   const selected = isMulti ? (Array.isArray(value) ? value : []) : [];
-  const remainingChips = chips.filter((c) => !selected.includes(c));
+  const singleVal = !isMulti && typeof value === 'string' && value ? value : null;
+  const remainingChips = chips.filter(
+    (c) => !selected.includes(c) && c !== singleVal,
+  );
 
   return (
     <div className="space-y-4">
@@ -224,8 +281,8 @@ function InputFirstLayout({
         </button>
       </div>
 
-      {/* Pills selecionadas (removíveis) */}
-      {selected.length > 0 && (
+      {/* Pills selecionadas (multi) */}
+      {isMulti && selected.length > 0 && (
         <div className="flex flex-wrap gap-1.5">
           {selected.map((item) => (
             <button
@@ -237,6 +294,19 @@ function InputFirstLayout({
               {item} ✕
             </button>
           ))}
+        </div>
+      )}
+
+      {/* Pill única (single) */}
+      {singleVal && (
+        <div className="flex flex-wrap gap-1.5">
+          <button
+            type="button"
+            onClick={onClearSingle}
+            className="rounded-full border border-[var(--color-fg)] bg-[var(--color-fg)] px-3 py-1.5 text-sm text-white transition hover:opacity-90"
+          >
+            {singleVal} ✕
+          </button>
         </div>
       )}
 

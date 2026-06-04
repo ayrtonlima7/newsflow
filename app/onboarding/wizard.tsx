@@ -119,6 +119,9 @@ export function OnboardingWizard({ userEmail }: { userEmail: string }) {
           contexto: answers.contexto,
           descricao_livre: answers.descricao_livre,
           objetivo: answers.objetivo,
+          referencias: answers.referencias,
+          formatos: answers.formatos,
+          ignorar: answers.ignorar,
         });
         if (error) setTopicsError(error);
         setDynamicTopics(topics);

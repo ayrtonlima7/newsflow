@@ -1,15 +1,11 @@
 import { getProvider, extractJson } from './providers';
-import { buildCuratePrompt, buildRetryCuratePrompt } from '../prompts/curate';
+import { buildCurateFromResultsPrompt, buildSearchQueries } from '../prompts/curate';
 import { buildEmailPrompt } from '../prompts/email';
 import { calculateCost } from './pricing';
-import { validateBriefingUrls, type DroppedItem, type DegradedItem } from './url-validation';
-import { recoverUrlsFromGrounding } from './url-recovery';
+import { filterReachableResults, type DroppedItem } from './url-validation';
+import { tavilySearchMany } from './search';
 import type { Profile, Briefing, BriefingItem, EmailOutput } from './types';
 import { frequenciaParaJanela } from './types';
-
-// Limite absoluto pra triggar retry: se o email final ficar abaixo disso,
-// vale a pena gastar mais tokens pra encher. Acima disso, aceita o resultado.
-const MIN_VALID_ITEMS = 3;
 
 export interface PipelineUsage {
   inputTokens: number;
@@ -25,136 +21,137 @@ export interface PipelineMeta {
   elapsedSeconds: number;
   usage: PipelineUsage;
   cost: ReturnType<typeof calculateCost>;
-  citations?: { url: string; title?: string }[];
+  searchQueries?: string[];
+  searchResultCount?: number;
+  reachableResultCount?: number;
   droppedItems?: DroppedItem[];
-  degradedItems?: DegradedItem[];
-  retryRan?: boolean;
+  hallucinatedUrlsDropped?: number;
 }
 
+/**
+ * Gera o briefing em 2 passos:
+ *   1. Tavily busca conteúdo REAL e fresco (URLs verdadeiras + datas).
+ *   2. DeepSeek (CURATE_LLM_PROVIDER) seleciona e escreve resumos densos —
+ *      só pode usar URLs da lista, então não há alucinação de link.
+ */
 export async function generateBriefing(
   profile: Profile,
 ): Promise<{ briefing: Briefing; meta: PipelineMeta }> {
-  const provider = await getProvider();
-  if (!provider.supportsWebSearch) {
-    throw new Error(
-      `Provider "${provider.name}" não suporta busca web nativa. Use LLM_PROVIDER=gemini para curadoria.`,
+  const janela = frequenciaParaJanela(profile.frequencia);
+  const t0 = Date.now();
+
+  // --- Passo 1: busca real via Tavily ---
+  const queries = buildSearchQueries(profile);
+  if (queries.length === 0) {
+    throw new Error('curate: nenhuma query de busca derivada do perfil');
+  }
+  const rawResults = await tavilySearchMany(queries, {
+    days: janela.janelaDias,
+    maxResults: 8,
+    topic: 'news',
+  });
+  console.log(
+    `[curate] Tavily: ${queries.length} query(s) → ${rawResults.length} resultado(s) único(s)`,
+  );
+
+  // --- Passo 1.5: valida que os links ABREM (UA de browser) ANTES de curar ---
+  // Com abundância de resultados, descartamos os quebrados em vez de degradar.
+  // Assim o LLM só escolhe URLs que funcionam de verdade.
+  const { reachable: searchResults, droppedCount: unreachableDropped } =
+    await filterReachableResults(rawResults);
+  if (unreachableDropped > 0) {
+    console.log(
+      `[curate] validação de links: ${unreachableDropped}/${rawResults.length} descartado(s) por não abrir; ${searchResults.length} ok`,
     );
   }
-  const { system, user } = buildCuratePrompt(profile);
-  const t0 = Date.now();
+
+  if (searchResults.length === 0) {
+    // Sem resultados acessíveis — retorna briefing vazio (delivery vira skipped_empty).
+    return {
+      briefing: { data_referencia: janela.todayISO, itens: [] },
+      meta: {
+        provider: 'tavily+none',
+        model: '-',
+        elapsedSeconds: (Date.now() - t0) / 1000,
+        usage: emptyUsage(),
+        cost: calculateCost('', emptyUsage()),
+        searchQueries: queries,
+        searchResultCount: rawResults.length,
+        reachableResultCount: 0,
+      },
+    };
+  }
+
+  // --- Passo 2: curadoria via LLM (sem web search) ---
+  const provider = await getProvider(
+    process.env.CURATE_LLM_PROVIDER ?? process.env.LLM_PROVIDER,
+  );
+  const { system, user } = buildCurateFromResultsPrompt(profile, searchResults);
   const result = await provider.complete({
     system,
     messages: [{ role: 'user', content: user }],
-    webSearch: true,
+    webSearch: false,
     maxTokens: 8192,
+    jsonMode: true,
   });
   const elapsedSeconds = (Date.now() - t0) / 1000;
   if (!result.text.trim()) {
-    throw new Error('curate: resposta vazia do modelo (tokens esgotados em raciocínio?)');
+    throw new Error('curate: resposta vazia do modelo');
   }
   const briefing = extractJson<Briefing>(result.text);
 
-  // Recovery: substituir URLs alucinadas pelas URLs reais das citations do grounding.
-  // Roda ANTES de todos os outros filtros — afinal, URL correta muda o resultado da validação.
-  const { recoveredItems, stats: recoveryStats } = await recoverUrlsFromGrounding(
-    briefing.itens,
-    result.citations ?? [],
-  );
-  briefing.itens = recoveredItems;
-  if (recoveryStats.recovered > 0) {
-    console.log(
-      `[curate] ${recoveryStats.recovered}/${briefing.itens.length} URL(s) recuperada(s) via grounding citations`,
-    );
-    for (const item of recoveredItems) {
-      if (item.urlOriginal) {
-        console.log(`  ↳ "${item.titulo}":`);
-        console.log(`     antes: ${item.urlOriginal}`);
-        console.log(`     agora: ${item.url}`);
-      }
-    }
-  }
+  // --- Garantia anti-alucinação: só aceita itens com URL presente nos resultados ---
+  const allowedUrls = new Set(searchResults.map((r) => r.url));
+  const beforeCount = briefing.itens.length;
+  briefing.itens = briefing.itens.filter((item) => {
+    if (allowedUrls.has(item.url)) return true;
+    console.warn(`[curate] item descartado (URL inventada, fora dos resultados): "${item.titulo}" → ${item.url}`);
+    return false;
+  });
+  const hallucinatedUrlsDropped = beforeCount - briefing.itens.length;
 
-  // Primeiro filtro: frescor. Descarta itens fora da janela de tempo OU sem data
-  // (antes mesmo de validar URLs — não vale gastar requests HTTP em conteúdo velho).
-  const janela = frequenciaParaJanela(profile.frequencia);
-  const {
-    freshItems,
-    staleDropped,
-  } = filterByFreshness(briefing.itens, janela.cutoffISO);
+  // --- Frescor: backstop usando a data que o modelo extraiu ---
+  // (URLs já foram validadas ANTES da curadoria, então não há validação HTTP aqui.
+  //  Todos os itens vêm de resultados que abrem de verdade.)
+  const { freshItems, staleDropped } = filterByFreshness(briefing.itens, janela.cutoffISO);
   if (staleDropped.length > 0) {
-    console.warn(
-      `[curate] ${staleDropped.length}/${briefing.itens.length} item(s) descartado(s) por frescor (cutoff: ${janela.cutoffISO}):`,
-    );
+    console.warn(`[curate] ${staleDropped.length} item(s) descartado(s) por frescor (cutoff ${janela.cutoffISO}):`);
     for (const d of staleDropped) {
-      console.warn(`  - "${d.item.titulo}" → ${d.reason} (data: ${d.item.data_publicacao || 'AUSENTE'})`);
+      console.warn(`  - "${d.item.titulo}" → ${d.reason}`);
     }
   }
 
-  const { validItems, droppedItems, degradedItems } = await validateBriefingUrls(freshItems);
-  if (droppedItems.length > 0) {
-    console.warn(
-      `[curate] ${droppedItems.length}/${briefing.itens.length} item(s) descartado(s) por URL inválida:`,
-    );
-    for (const d of droppedItems) {
-      console.warn(`  - "${d.item.titulo}" → ${d.reason} (${d.item.url})`);
-    }
-  }
-  if (degradedItems.length > 0) {
-    console.warn(
-      `[curate] ${degradedItems.length}/${briefing.itens.length} item(s) com URL degradada (fallback/source-only):`,
-    );
-    for (const d of degradedItems) {
-      console.warn(
-        `  ~ "${d.item.titulo}" → status=${d.item.urlStatus} | ${d.reason} | usando ${d.item.url}`,
-      );
-    }
-  }
+  // Marca todos como verified (já validados upfront) pra o email renderizar link normal
+  briefing.itens = freshItems.map((item) => ({ ...item, urlStatus: 'verified' as const }));
 
-  // Aggregate accumulators (cost/usage somam retry; itens são merge)
-  const accValid: typeof validItems = [...validItems];
-  const accDropped: typeof droppedItems = [...staleDropped, ...droppedItems];
-  const accDegraded: typeof degradedItems = [...degradedItems];
-  let accUsage = { ...result.usage };
-  let accElapsedSeconds = elapsedSeconds;
-  let retryRan = false;
+  const cost = calculateCost(provider.model, result.usage);
+  console.log(
+    `[curate] final: ${briefing.itens.length} item(s) | search→${rawResults.length}, reachable→${searchResults.length}, IA selecionou→${beforeCount}, alucinadas→${hallucinatedUrlsDropped}, stale→${staleDropped.length}`,
+  );
 
-  // Retry pass: só se poucos válidos sobreviveram E houve descartes (evita loop quando o modelo simplesmente retornou pouco)
-  if (validItems.length < MIN_VALID_ITEMS && droppedItems.length > 0) {
-    console.warn(
-      `[curate] só ${validItems.length} item(s) válido(s) (alvo: ${MIN_VALID_ITEMS}+). Executando retry pass…`,
-    );
-    const retryResult = await retryCurate(profile, accValid, accDropped);
-    retryRan = true;
-    if (retryResult) {
-      accValid.push(...retryResult.newValidItems);
-      accDropped.push(...retryResult.newDroppedItems);
-      accDegraded.push(...retryResult.newDegradedItems);
-      accUsage = sumUsage(accUsage, retryResult.usage);
-      accElapsedSeconds += retryResult.elapsedSeconds;
-      console.warn(
-        `[curate] retry: +${retryResult.newValidItems.length} válido(s), +${retryResult.newDroppedItems.length} descartado(s). Total agora: ${accValid.length} item(s).`,
-      );
-    } else {
-      console.warn('[curate] retry pass não conseguiu executar (provider sem web search?)');
-    }
-  }
-
-  briefing.itens = accValid;
-
-  const cost = calculateCost(provider.model, accUsage);
   return {
     briefing,
     meta: {
-      provider: provider.name,
+      provider: `tavily+${provider.name}`,
       model: provider.model,
-      elapsedSeconds: accElapsedSeconds,
-      usage: accUsage,
+      elapsedSeconds,
+      usage: result.usage,
       cost,
-      citations: result.citations,
-      droppedItems: accDropped,
-      ...(accDegraded.length > 0 ? { degradedItems: accDegraded } : {}),
-      ...(retryRan ? { retryRan: true } : {}),
+      searchQueries: queries,
+      searchResultCount: rawResults.length,
+      reachableResultCount: searchResults.length,
+      ...(hallucinatedUrlsDropped > 0 ? { hallucinatedUrlsDropped } : {}),
     },
+  };
+}
+
+function emptyUsage(): PipelineUsage {
+  return {
+    inputTokens: 0,
+    outputTokens: 0,
+    toolTokens: 0,
+    totalTokens: 0,
+    groundingRequests: 0,
   };
 }
 
@@ -195,144 +192,14 @@ function filterByFreshness(
   return { freshItems, staleDropped };
 }
 
-function sumUsage(a: PipelineUsage, b: PipelineUsage): PipelineUsage {
-  return {
-    inputTokens: a.inputTokens + b.inputTokens,
-    outputTokens: a.outputTokens + b.outputTokens,
-    toolTokens: a.toolTokens + b.toolTokens,
-    totalTokens: a.totalTokens + b.totalTokens,
-    groundingRequests: a.groundingRequests + b.groundingRequests,
-  };
-}
-
-async function retryCurate(
-  profile: Profile,
-  validItems: Briefing['itens'],
-  droppedItems: DroppedItem[],
-): Promise<{
-  newValidItems: Briefing['itens'];
-  newDroppedItems: DroppedItem[];
-  newDegradedItems: DegradedItem[];
-  usage: PipelineUsage;
-  elapsedSeconds: number;
-} | null> {
-  const provider = await getProvider();
-  if (!provider.supportsWebSearch) return null;
-
-  const retryTargetJanela = frequenciaParaJanela(profile.frequencia);
-  const { system, user } = buildRetryCuratePrompt(profile, {
-    validItems,
-    brokenItems: droppedItems.map((d) => ({
-      titulo: d.item.titulo,
-      url: d.item.url,
-      reason: d.reason,
-    })),
-    targetMin: retryTargetJanela.itemsMin,
-    targetMax: retryTargetJanela.itemsMax,
-  });
-
-  const t0 = Date.now();
-  const result = await provider.complete({
-    system,
-    messages: [{ role: 'user', content: user }],
-    webSearch: true,
-    maxTokens: 8192,
-  });
-  const elapsedSeconds = (Date.now() - t0) / 1000;
-
-  if (!result.text.trim()) {
-    console.warn('[curate.retry] resposta vazia');
-    return {
-      newValidItems: [],
-      newDroppedItems: [],
-      newDegradedItems: [],
-      usage: result.usage,
-      elapsedSeconds,
-    };
-  }
-
-  let retryBriefing: Briefing;
-  try {
-    retryBriefing = extractJson<Briefing>(result.text);
-  } catch (err) {
-    console.warn('[curate.retry] falha ao parsear JSON:', err);
-    return {
-      newValidItems: [],
-      newDroppedItems: [],
-      newDegradedItems: [],
-      usage: result.usage,
-      elapsedSeconds,
-    };
-  }
-
-  // Recovery via grounding citations no retry também
-  const { recoveredItems: retryRecovered, stats: retryRecoveryStats } =
-    await recoverUrlsFromGrounding(retryBriefing.itens, result.citations ?? []);
-  if (retryRecoveryStats.recovered > 0) {
-    console.log(
-      `[curate.retry] ${retryRecoveryStats.recovered} URL(s) recuperada(s) via grounding`,
-    );
-  }
-
-  // Filtra URLs já presentes no primeiro pass (válidas ou descartadas)
-  const seen = new Set<string>([
-    ...validItems.map((v) => v.url),
-    ...droppedItems.map((d) => d.item.url),
-  ]);
-  const candidates = retryRecovered.filter((i) => !seen.has(i.url));
-  if (candidates.length < retryRecovered.length) {
-    console.warn(
-      `[curate.retry] modelo retornou ${retryRecovered.length - candidates.length} item(s) repetido(s) — descartados`,
-    );
-  }
-
-  // Filtro de frescor no retry também
-  const retryJanela = frequenciaParaJanela(profile.frequencia);
-  const { freshItems: retryFresh, staleDropped: retryStale } = filterByFreshness(
-    candidates,
-    retryJanela.cutoffISO,
-  );
-  if (retryStale.length > 0) {
-    console.warn(`[curate.retry] ${retryStale.length} item(s) descartado(s) por frescor:`);
-    for (const d of retryStale) {
-      console.warn(`  - "${d.item.titulo}" → ${d.reason}`);
-    }
-  }
-
-  const {
-    validItems: retryValid,
-    droppedItems: retryDropped,
-    degradedItems: retryDegraded,
-  } = await validateBriefingUrls(retryFresh);
-  if (retryDropped.length > 0) {
-    console.warn(`[curate.retry] validação derrubou ${retryDropped.length}/${candidates.length}:`);
-    for (const d of retryDropped) {
-      console.warn(`  - "${d.item.titulo}" → ${d.reason}`);
-    }
-  }
-  if (retryDegraded.length > 0) {
-    console.warn(`[curate.retry] ${retryDegraded.length} item(s) degradado(s) no retry:`);
-    for (const d of retryDegraded) {
-      console.warn(`  ~ "${d.item.titulo}" → status=${d.item.urlStatus}`);
-    }
-  }
-
-  return {
-    newValidItems: retryValid,
-    newDroppedItems: [...retryStale, ...retryDropped],
-    newDegradedItems: retryDegraded,
-    usage: result.usage,
-    elapsedSeconds,
-  };
-}
-
 export async function generateEmail(
   profile: Profile,
   briefing: Briefing,
 ): Promise<{ email: EmailOutput; meta: PipelineMeta }> {
-  // Permite usar um provider mais barato pro email (sem busca web).
-  // Ex: LLM_PROVIDER=gemini + EMAIL_LLM_PROVIDER=deepseek
-  const provider = await getProvider(process.env.EMAIL_LLM_PROVIDER);
+  // Provider do email (default = LLM_PROVIDER).
+  const provider = await getProvider(
+    process.env.EMAIL_LLM_PROVIDER ?? process.env.LLM_PROVIDER,
+  );
   const { system, user } = buildEmailPrompt(profile, briefing);
   const t0 = Date.now();
   const result = await provider.complete({

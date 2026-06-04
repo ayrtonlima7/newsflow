@@ -1,4 +1,5 @@
 import type { BriefingItem, UrlStatus } from './types';
+import type { SearchResult } from './search';
 
 export interface DroppedItem {
   item: BriefingItem;
@@ -22,8 +23,10 @@ export interface ValidationReport {
 const PLACEHOLDER_PATTERN =
   /\b(your[_-]?video[_-]?id|your[_-]?id|example\.com|placeholder|TODO|FIXME|\.\.\.+|\[ID\])\b/i;
 
+// UA de browser real — sites como AOL/grandes portais recusam UAs de bot.
+// Validar com UA real reduz falso-positivo (passa na validação mas não abre).
 const USER_AGENT =
-  'Mozilla/5.0 (compatible; NewsFlowBot/1.0; +https://newsflow.ai/bot)';
+  'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
 
 const TIMEOUT_MS = 8000;
 
@@ -284,6 +287,36 @@ async function validateHackerNews(parsed: URL): Promise<{ ok: boolean; reason: s
     const msg = err instanceof Error ? err.message : String(err);
     return { ok: false, reason: `HN check falhou: ${msg}` };
   }
+}
+
+/**
+ * Filtra resultados da Tavily deixando só os que ABREM de verdade num browser.
+ * Usado ANTES de mandar pro LLM curar — assim o modelo só escolhe URLs que
+ * funcionam, e não precisamos de degradação (com 32 resultados, dá pra ser
+ * exigente e descartar os quebrados).
+ *
+ * Faz HEAD com UA de browser; se 405/403/501, tenta GET parcial. Qualquer
+ * 2xx/3xx = ok. Resto = descarta.
+ */
+export async function filterReachableResults(
+  results: SearchResult[],
+): Promise<{ reachable: SearchResult[]; droppedCount: number }> {
+  const checks = await Promise.all(
+    results.map(async (r) => {
+      if (PLACEHOLDER_PATTERN.test(r.url)) return false;
+      try {
+        const parsed = new URL(r.url);
+        if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return false;
+        const check = await validateGeneric(r.url);
+        return check.ok;
+      } catch {
+        return false;
+      }
+    }),
+  );
+
+  const reachable = results.filter((_, i) => checks[i]);
+  return { reachable, droppedCount: results.length - reachable.length };
 }
 
 export async function validateBriefingUrls(items: BriefingItem[]): Promise<ValidationReport> {

@@ -1,11 +1,110 @@
 import type { Profile, BriefingItem } from '../lib/types';
 import { frequenciaParaJanela, profileForPrompt } from '../lib/types';
+import type { SearchResult } from '../lib/search';
 
 export interface RetryContext {
   validItems: BriefingItem[];
   brokenItems: { titulo: string; url: string; reason: string }[];
   targetMin: number;
   targetMax: number;
+}
+
+/**
+ * Curadoria a partir de resultados de busca reais (Tavily). O modelo NÃO busca
+ * — ele recebe os resultados, seleciona os melhores e escreve resumos densos.
+ *
+ * Vantagem central: as URLs vêm dos resultados reais, então o modelo é proibido
+ * de inventar links. Só pode usar as URLs fornecidas. Isso elimina alucinação.
+ */
+export function buildCurateFromResultsPrompt(
+  profile: Profile,
+  results: SearchResult[],
+): { system: string; user: string } {
+  const janela = frequenciaParaJanela(profile.frequencia);
+  const p = profileForPrompt(profile);
+
+  const system =
+    'Você é um agente de curadoria de conteúdo profissional. Você recebe uma LISTA ' +
+    'DE RESULTADOS DE BUSCA REAIS (com título, URL e trecho) e o perfil de um usuário. ' +
+    'Sua tarefa é SELECIONAR os mais relevantes e frescos, e escrever resumos densos. ' +
+    'REGRA ABSOLUTA: você só pode usar URLs que estão EXATAMENTE na lista fornecida. ' +
+    'NUNCA invente, modifique ou complete uma URL. Copie verbatim da lista.';
+
+  // Monta a lista numerada de resultados pro modelo escolher
+  const resultsList = results
+    .map((r, i) => {
+      const date = r.publishedDate ? ` | publicado: ${r.publishedDate}` : '';
+      return `[${i + 1}] ${r.title}
+    URL: ${r.url}${date}
+    Trecho: ${r.content.slice(0, 500)}`;
+    })
+    .join('\n\n');
+
+  const user = `PERFIL DO USUÁRIO:
+${JSON.stringify(p, null, 2)}
+
+DATA ATUAL: ${janela.todayISO}
+JANELA DE FRESCOR: conteúdo dos últimos ${janela.janelaDias} dias (não inclua nada antes de ${janela.cutoffISO}).
+
+RESULTADOS DE BUSCA DISPONÍVEIS (${results.length} itens):
+${resultsList}
+
+INSTRUÇÕES:
+- SELECIONE entre ${janela.itemsMin} e ${janela.itemsMax} resultados da lista acima — os mais
+  relevantes pro perfil e mais frescos. Qualidade acima de quantidade.
+- Use o "objetivo" e "contexto" do usuário pra calibrar o recorte e a profundidade.
+- Priorize itens alinhados com os "topicos" e "referencias" do usuário.
+- IGNORE completamente o que cai nos temas de "ignorar".
+- Para cada item selecionado:
+  * titulo: use o título do resultado (pode refinar levemente pra clareza, mas fiel ao conteúdo)
+  * fonte: nome do veículo/site (extraia do domínio da URL)
+  * url: COPIE EXATAMENTE a URL do resultado escolhido. Proibido modificar.
+  * data_publicacao: use a data do resultado (campo "publicado"). Se não tiver, estime
+    pela recência aparente mas mantenha dentro da janela; se impossível, use ${janela.todayISO}.
+  * relevancia: "Alta" ou "Média"
+  * motivo_relevancia: 1 frase de por que importa PRA ESSE usuário
+  * resumo: 6 a 10 linhas, denso, com fatos concretos do trecho — números, nomes, datas,
+    contexto, implicações. Autocontido: o leitor entende o assunto inteiro sem clicar.
+    Se o trecho for curto, expanda com o que dá pra inferir com segurança, mas NÃO invente fatos.
+- Se NENHUM resultado for relevante o suficiente, retorne "itens": [].
+
+RESPONDA APENAS COM UM JSON VÁLIDO, sem markdown, sem texto antes ou depois:
+{
+  "data_referencia": "${janela.todayISO}",
+  "itens": [
+    {
+      "titulo": "",
+      "fonte": "",
+      "url": "(copiada EXATAMENTE de um resultado acima)",
+      "data_publicacao": "YYYY-MM-DD",
+      "relevancia": "Alta",
+      "motivo_relevancia": "",
+      "resumo": ""
+    }
+  ]
+}`;
+
+  return { system, user };
+}
+
+/** Constrói as queries de busca a partir do perfil. Combina tópicos normalizados
+ *  com o tema pra dar contexto. Referencias entram como query separada quando há. */
+export function buildSearchQueries(profile: Profile): string[] {
+  const p = profileForPrompt(profile);
+  const queries: string[] = [];
+
+  // Uma query por tópico (são os sinais mais específicos)
+  for (const topico of p.topicos) {
+    if (topico && topico.trim()) queries.push(topico.trim());
+  }
+
+  // Se não houver tópicos (raro), cai pro tema
+  if (queries.length === 0 && p.tema.length > 0) {
+    queries.push(p.tema.join(' '));
+  }
+
+  // Cap em 6 queries pra não estourar o free tier da Tavily
+  return queries.slice(0, 6);
 }
 
 export function buildCuratePrompt(profile: Profile): { system: string; user: string } {

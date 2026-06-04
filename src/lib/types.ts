@@ -1,35 +1,39 @@
 export interface Profile {
-  area: string;
-  cargo: string;
-  topicos: string[];
-  /** Versão normalizada por LLM dos tópicos. Usada nos prompts em vez de `topicos`
-   *  pra reduzir alucinação. Se vazio/undefined, prompts caem em `topicos`. */
-  topicos_busca?: string[];
-  ignorar: string[];
-  frequencia: string;
-  horario: string;
-  tom: string;
-  fontes_prioritarias: string[];
-  descricoes_livres: Record<string, string>;
-}
+  /** Como o usuário quer ser chamado nos emails. */
+  nome: string;
 
-/** Converte o Profile (UI) na forma vista pelos prompts: substitui `topicos`
- *  pela versão normalizada (`topicos_busca`) quando disponível e remove o campo
- *  bruto, pra evitar confundir o modelo com duas listas. */
-export function profileForPrompt(profile: Profile): Omit<Profile, 'topicos_busca'> {
-  const hasNormalized =
-    Array.isArray(profile.topicos_busca) && profile.topicos_busca.length > 0;
-  return {
-    area: profile.area,
-    cargo: profile.cargo,
-    topicos: hasNormalized ? (profile.topicos_busca as string[]) : profile.topicos,
-    ignorar: profile.ignorar,
-    frequencia: profile.frequencia,
-    horario: profile.horario,
-    tom: profile.tom,
-    fontes_prioritarias: profile.fontes_prioritarias,
-    descricoes_livres: profile.descricoes_livres,
-  };
+  /** Temas amplos de interesse (multi). Pode ser profissão, hobby, curiosidade. */
+  tema: string[];
+
+  /** Contexto da relação com o(s) tema(s): Profissão / Estudo / Hobby ou paixão / Curiosidade geral. */
+  contexto: string;
+
+  /** Descrição livre opcional sobre o momento do usuário no tema (só faz sentido se contexto = Profissão ou Estudo). */
+  descricao_livre: string;
+
+  /** Intent — o que o usuário quer ganhar lendo os emails. */
+  objetivo: string;
+
+  /** Tags específicas que estão no radar do usuário (entidades, ferramentas, conceitos). */
+  topicos: string[];
+
+  /** Versão normalizada por LLM dos tópicos, usada nos prompts pra reduzir alucinação. */
+  topicos_busca?: string[];
+
+  /** Pessoas, marcas, podcasts, canais que o usuário admira. Vai como sinal de qualidade pro curate. */
+  referencias: string[];
+
+  /** Formatos de conteúdo preferidos (artigos longos, posts curtos, podcasts...). */
+  formatos: string[];
+
+  /** Padrões e tópicos a ignorar/filtrar. */
+  ignorar: string[];
+
+  /** Cadência de envio (Uma vez por semana / Todo dia de manhã). */
+  frequencia: string;
+
+  /** Horário fixo em 8h hoje (Vercel Hobby roda cron 1×/dia). Reativável no Pro. */
+  horario: string;
 }
 
 export type Relevancia = 'Alta' | 'Média';
@@ -57,4 +61,38 @@ export function frequenciaParaJanela(frequencia: string): { dias: number; rotulo
   const f = frequencia.toLowerCase();
   if (f.includes('semana')) return { dias: 7, rotulo: 'últimos 7 dias' };
   return { dias: 1, rotulo: 'últimas 24 horas' };
+}
+
+/**
+ * Versão do Profile vista pelos prompts da IA. Substitui `topicos` pela versão
+ * normalizada (`topicos_busca`) quando disponível e remove campos internos.
+ */
+export function profileForPrompt(profile: Profile): {
+  nome: string;
+  tema: string[];
+  contexto: string;
+  descricao_livre: string;
+  objetivo: string;
+  topicos: string[];
+  referencias: string[];
+  formatos: string[];
+  ignorar: string[];
+  frequencia: string;
+} {
+  const hasNormalized =
+    Array.isArray(profile.topicos_busca) && profile.topicos_busca.length > 0;
+  const topicos = hasNormalized ? (profile.topicos_busca as string[]) : profile.topicos;
+
+  return {
+    nome: profile.nome ?? '',
+    tema: profile.tema ?? [],
+    contexto: profile.contexto ?? '',
+    descricao_livre: profile.descricao_livre ?? '',
+    objetivo: profile.objetivo ?? '',
+    topicos,
+    referencias: profile.referencias ?? [],
+    formatos: profile.formatos ?? [],
+    ignorar: profile.ignorar ?? [],
+    frequencia: profile.frequencia ?? '',
+  };
 }

@@ -1,27 +1,27 @@
 {
-  "area": "Tecnologia",
-  "cargo": "Desenvolvedor",
+  "nome": "Ayrton",
+  "tema": ["Tecnologia"],
+  "contexto": "Profissão",
+  "descricao_livre": "Desenvolvedor solo construindo um SaaS de curadoria por IA. Quero entender o que está acontecendo na fronteira de produtos com LLMs e padrões de engenharia que economizam tempo na prática.",
+  "objetivo": "Decisões pro meu dia a dia",
   "topicos": [
     "Inteligência Artificial aplicada a produtos",
     "Engenharia de software pragmática",
     "Frontend moderno (React, Next.js)",
     "Anthropic Claude e LLMs em produção"
   ],
+  "referencias": [
+    "Anthropic blog",
+    "Vercel blog",
+    "Paul Graham",
+    "Hacker News"
+  ],
+  "formatos": ["Artigos longos", "Posts de redes / threads"],
   "ignorar": [
-    "Conteúdo muito básico/iniciante",
+    "Conteúdo muito básico",
     "Tutoriais passo a passo",
-    "Opinião e polêmica de redes sociais"
+    "Opinião e polêmica"
   ],
   "frequencia": "Todo dia de manhã",
-  "horario": "7h",
-  "tom": "Direto e técnico",
-  "fontes_prioritarias": [
-    "Hacker News",
-    "X/Twitter (desenvolvedores e founders)",
-    "Anthropic blog",
-    "Vercel blog"
-  ],
-  "descricoes_livres": {
-    "contexto": "Sou desenvolvedor solo construindo um SaaS de curadoria por IA. Quero entender o que está acontecendo na fronteira de produtos com LLMs e padrões de engenharia que economizam tempo na prática."
-  }
+  "horario": "8h"
 }

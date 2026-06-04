@@ -35,7 +35,9 @@ async function main() {
   const { system, user } = buildCuratePrompt(profile);
 
   console.log(`[curate] provider=${provider.name} model=${provider.model}`);
-  console.log(`[curate] perfil: ${profile.area} / ${profile.cargo} — tópicos: ${profile.topicos.join(', ')}`);
+  console.log(
+    `[curate] perfil: ${profile.nome || '(sem nome)'} — ${profile.tema.join(', ')} (${profile.contexto || '?'}) — tópicos: ${profile.topicos.join(', ')}`,
+  );
   console.log(`[curate] chamando o modelo com web search habilitado…`);
   const t0 = Date.now();
 

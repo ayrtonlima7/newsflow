@@ -31,28 +31,40 @@ export function ConfirmCard({
     <div className="space-y-6">
       <div className="space-y-2">
         <h2 className="text-2xl font-semibold tracking-tight">
-          Aqui está seu perfil de curadoria
+          {profile.nome ? `Tudo certo, ${profile.nome}?` : 'Tudo certo?'}
         </h2>
         <p className="text-sm text-[var(--color-muted)]">
-          Confere se está tudo certo. Você pode editar a qualquer momento depois.
+          Confere se está tudo como você quer. Pode editar a qualquer momento depois.
         </p>
       </div>
 
       <dl className="space-y-4 rounded-lg border border-[var(--color-border)] bg-white p-6 text-sm">
-        <Row label="Área">{profile.area}</Row>
-        <Row label="Cargo">{profile.cargo}</Row>
+        <Row label="Nome">{profile.nome || <Empty />}</Row>
+        <Row label="Tema(s)">
+          <ChipList items={profile.tema} />
+        </Row>
+        <Row label="Contexto">{profile.contexto || <Empty />}</Row>
+        {profile.descricao_livre && (
+          <Row label="Sobre você">{profile.descricao_livre}</Row>
+        )}
+        <Row label="Objetivo">{profile.objetivo || <Empty />}</Row>
         <Row label="Tópicos">
           <ChipList items={profile.topicos} />
         </Row>
-        <Row label="Ignorar">
-          <ChipList items={profile.ignorar} muted />
+        {profile.referencias.length > 0 && (
+          <Row label="Referências">
+            <ChipList items={profile.referencias} />
+          </Row>
+        )}
+        <Row label="Formatos">
+          <ChipList items={profile.formatos} />
         </Row>
-        <Row label="Frequência">{profile.frequencia}</Row>
-        <Row label="Horário">{profile.horario}</Row>
-        <Row label="Tom">{profile.tom}</Row>
-        <Row label="Fontes prioritárias">
-          <ChipList items={profile.fontes_prioritarias} />
-        </Row>
+        {profile.ignorar.length > 0 && (
+          <Row label="Ignorar">
+            <ChipList items={profile.ignorar} muted />
+          </Row>
+        )}
+        <Row label="Frequência">{profile.frequencia || <Empty />}</Row>
       </dl>
 
       {error && (
@@ -85,16 +97,19 @@ export function ConfirmCard({
 
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="grid grid-cols-[120px_1fr] gap-4">
+    <div className="grid grid-cols-[140px_1fr] gap-4">
       <dt className="text-[var(--color-muted)]">{label}</dt>
       <dd className="font-medium">{children}</dd>
     </div>
   );
 }
 
+function Empty() {
+  return <span className="text-[var(--color-muted)] font-normal">—</span>;
+}
+
 function ChipList({ items, muted }: { items: string[]; muted?: boolean }) {
-  if (!items || items.length === 0)
-    return <span className="text-[var(--color-muted)] font-normal">—</span>;
+  if (!items || items.length === 0) return <Empty />;
   return (
     <div className="flex flex-wrap gap-1.5">
       {items.map((item) => (

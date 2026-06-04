@@ -62,20 +62,24 @@ async function main() {
   }
 
   const profile: Profile = {
-    area: profileRow.area,
-    cargo: profileRow.cargo,
-    topicos: profileRow.topicos,
+    nome: profileRow.nome ?? '',
+    tema: profileRow.tema ?? [],
+    contexto: profileRow.contexto ?? '',
+    descricao_livre: profileRow.descricao_livre ?? '',
+    objetivo: profileRow.objetivo ?? '',
+    topicos: profileRow.topicos ?? [],
     topicos_busca: profileRow.topicos_busca ?? undefined,
-    ignorar: profileRow.ignorar,
-    frequencia: profileRow.frequencia,
-    horario: profileRow.horario,
-    tom: profileRow.tom,
-    fontes_prioritarias: profileRow.fontes_prioritarias,
-    descricoes_livres: profileRow.descricoes_livres ?? {},
+    referencias: profileRow.referencias ?? [],
+    formatos: profileRow.formatos ?? [],
+    ignorar: profileRow.ignorar ?? [],
+    frequencia: profileRow.frequencia ?? '',
+    horario: profileRow.horario ?? '8h',
   };
 
   console.log(`[deliver] user=${userEmail} dry=${dryRun}`);
-  console.log(`[deliver] perfil: ${profile.area} / ${profile.cargo}`);
+  console.log(
+    `[deliver] perfil: ${profile.nome || '(sem nome)'} — ${profile.tema.join(', ') || '(sem tema)'} (${profile.contexto || 'sem contexto'})`,
+  );
   console.log(`[deliver] tópicos: ${profile.topicos.join(', ')}`);
 
   const result = await runDeliveryPipeline(

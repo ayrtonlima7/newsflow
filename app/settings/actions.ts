@@ -7,14 +7,16 @@ import { runDeliveryPipeline } from '@/src/lib/delivery';
 import type { Profile } from '@/src/lib/types';
 
 export interface ProfileUpdateInput {
-  area: string;
-  cargo: string;
+  nome: string;
+  tema: string[];
+  contexto: string;
+  descricao_livre: string;
+  objetivo: string;
   topicos: string[];
+  referencias: string[];
+  formatos: string[];
   ignorar: string[];
   frequencia: string;
-  horario: string;
-  tom: string;
-  fontes_prioritarias: string[];
 }
 
 export async function updateProfile(
@@ -26,33 +28,49 @@ export async function updateProfile(
   } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: 'não autenticado' };
 
-  if (!input.area?.trim() || !input.cargo?.trim()) {
-    return { ok: false, error: 'área e cargo são obrigatórios' };
+  if (!input.nome?.trim()) {
+    return { ok: false, error: 'nome é obrigatório' };
+  }
+  if (!Array.isArray(input.tema) || input.tema.length === 0) {
+    return { ok: false, error: 'escolha pelo menos um tema' };
+  }
+  if (!input.contexto?.trim()) {
+    return { ok: false, error: 'escolha um contexto' };
+  }
+  if (!input.objetivo?.trim()) {
+    return { ok: false, error: 'escolha um objetivo' };
   }
   if (!Array.isArray(input.topicos) || input.topicos.length === 0) {
-    return { ok: false, error: 'pelo menos um tópico é obrigatório' };
+    return { ok: false, error: 'adicione pelo menos um tópico' };
   }
-  if (!input.frequencia?.trim() || !input.horario?.trim() || !input.tom?.trim()) {
-    return { ok: false, error: 'frequência, horário e tom são obrigatórios' };
+  if (!Array.isArray(input.formatos) || input.formatos.length === 0) {
+    return { ok: false, error: 'escolha pelo menos um formato' };
+  }
+  if (!input.frequencia?.trim()) {
+    return { ok: false, error: 'escolha uma frequência' };
   }
 
   const topicos_busca = await normalizeTopics(input.topicos, {
-    area: input.area.trim(),
-    cargo: input.cargo.trim(),
+    tema: input.tema,
+    contexto: input.contexto,
+    descricao_livre: input.descricao_livre,
+    objetivo: input.objetivo,
   });
 
   const { error } = await supabase
     .from('profiles')
     .update({
-      area: input.area.trim(),
-      cargo: input.cargo.trim(),
+      nome: input.nome.trim(),
+      tema: input.tema,
+      contexto: input.contexto,
+      descricao_livre: input.descricao_livre ?? '',
+      objetivo: input.objetivo,
       topicos: input.topicos,
       topicos_busca,
+      referencias: input.referencias ?? [],
+      formatos: input.formatos,
       ignorar: input.ignorar ?? [],
-      frequencia: input.frequencia.trim(),
-      horario: input.horario.trim(),
-      tom: input.tom.trim(),
-      fontes_prioritarias: input.fontes_prioritarias ?? [],
+      frequencia: input.frequencia,
     })
     .eq('user_id', user.id);
 
@@ -75,8 +93,6 @@ export interface SampleResult {
   cooldownRemainingMs?: number;
 }
 
-// Cooldown entre cliques no "Enviar agora" pra evitar spam de geração e
-// gastos de API descontrolados. Vale por usuário.
 export const SAMPLE_COOLDOWN_MS = 5 * 60 * 1000;
 
 export async function sendSampleNow(): Promise<SampleResult> {
@@ -94,7 +110,6 @@ export async function sendSampleNow(): Promise<SampleResult> {
   if (error) return { ok: false, error: error.message };
   if (!profileRow) return { ok: false, error: 'perfil não encontrado' };
 
-  // Checagem de cooldown — não confiar só no frontend, validar aqui também
   if (profileRow.last_delivered_at) {
     const last = new Date(profileRow.last_delivered_at).getTime();
     const elapsed = Date.now() - last;
@@ -110,16 +125,18 @@ export async function sendSampleNow(): Promise<SampleResult> {
   }
 
   const profile: Profile = {
-    area: profileRow.area,
-    cargo: profileRow.cargo,
-    topicos: profileRow.topicos,
+    nome: profileRow.nome ?? '',
+    tema: profileRow.tema ?? [],
+    contexto: profileRow.contexto ?? '',
+    descricao_livre: profileRow.descricao_livre ?? '',
+    objetivo: profileRow.objetivo ?? '',
+    topicos: profileRow.topicos ?? [],
     topicos_busca: profileRow.topicos_busca ?? undefined,
-    ignorar: profileRow.ignorar,
-    frequencia: profileRow.frequencia,
-    horario: profileRow.horario,
-    tom: profileRow.tom,
-    fontes_prioritarias: profileRow.fontes_prioritarias,
-    descricoes_livres: profileRow.descricoes_livres ?? {},
+    referencias: profileRow.referencias ?? [],
+    formatos: profileRow.formatos ?? [],
+    ignorar: profileRow.ignorar ?? [],
+    frequencia: profileRow.frequencia ?? '',
+    horario: profileRow.horario ?? '8h',
   };
 
   const result = await runDeliveryPipeline(

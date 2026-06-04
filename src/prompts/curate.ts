@@ -20,10 +20,21 @@ export function buildCuratePrompt(profile: Profile): { system: string; user: str
 ${JSON.stringify(profileForPrompt(profile), null, 2)}
 
 INSTRUÇÕES:
-- Pesquise nas fontes indicadas pelo usuário e nas fontes convencionais da área dele
-  (Twitter/X, LinkedIn, Reddit, Hacker News, blogs especializados, portais do setor).
-- Se a área for específica (ex: jardinagem, enfermagem), priorize portais e comunidades
-  especializadas dessa área.
+- Pesquise nas referências do usuário (campo "referencias") e nas fontes convencionais
+  dos temas dele (blogs, portais, comunidades). Priorize as referências quando aparecerem.
+- O campo "contexto" (Profissão/Estudo/Hobby/Curiosidade) e "descricao_livre" são
+  CRÍTICOS pra calibrar PROFUNDIDADE. Profissão → conteúdo técnico, aplicável; Estudo →
+  fundamentos com profundidade média; Hobby → ângulo apaixonado, casos reais; Curiosidade →
+  acessível, contexto pra leigo.
+- O campo "objetivo" determina o RECORTE do que selecionar:
+  * "Ficar de olho no que tá rolando" → priorize lançamentos, anúncios, eventos recentes
+  * "Aprender coisas novas" → priorize tutoriais avançados, papers, explicadores
+  * "Decisões pro meu dia a dia" → priorize comparativos, trade-offs, casos reais aplicáveis
+  * "Inspiração e tendências" → priorize cases inspiradores, projetos notórios, visões
+  * "Cultura geral / saber sobre" → priorize panoramas, debates, contexto histórico
+- O campo "formatos" indica preferência de tipo de conteúdo. Priorize esses formatos.
+- Se o tema é específico de nicho (ex: jardinagem, enfermagem equina, restauração de móveis),
+  busque em portais e comunidades especializadas — não force fontes mainstream.
 - Selecione entre 4 e 7 conteúdos. Qualidade acima de quantidade — uma camada
   de validação posterior descarta URLs quebradas, então priorize itens cujas
   URLs você tem alta confiança que são reais.

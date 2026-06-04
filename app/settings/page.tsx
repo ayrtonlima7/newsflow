@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server';
 import { signOut } from '@/app/login/actions';
 import { SettingsForm } from './settings-form';
 import { SampleCard } from './sample-card';
+import type { ProfileUpdateInput } from './actions';
 
 // O pipeline (curate + email + send) pode levar ~60s. Server actions desta rota herdam.
 export const maxDuration = 60;
@@ -32,15 +33,17 @@ export default async function SettingsPage({
 
   const isAdmin = !!process.env.ADMIN_EMAIL && user.email === process.env.ADMIN_EMAIL;
 
-  const initial = {
-    area: profile.area,
-    cargo: profile.cargo,
+  const initial: ProfileUpdateInput = {
+    nome: profile.nome ?? '',
+    tema: profile.tema ?? [],
+    contexto: profile.contexto ?? '',
+    descricao_livre: profile.descricao_livre ?? '',
+    objetivo: profile.objetivo ?? '',
     topicos: profile.topicos ?? [],
+    referencias: profile.referencias ?? [],
+    formatos: profile.formatos ?? [],
     ignorar: profile.ignorar ?? [],
-    frequencia: profile.frequencia,
-    horario: profile.horario,
-    tom: profile.tom,
-    fontes_prioritarias: profile.fontes_prioritarias ?? [],
+    frequencia: profile.frequencia ?? '',
   };
 
   return (
@@ -76,8 +79,8 @@ export default async function SettingsPage({
 
       {welcome && (
         <div className="rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
-          ✓ Perfil salvo! O primeiro email vai chegar no horário e frequência que você escolheu —
-          ou clique abaixo pra receber um exemplo agora.
+          ✓ Perfil salvo! O primeiro email vai chegar na frequência que você escolheu — ou clique
+          abaixo pra receber um exemplo agora.
         </div>
       )}
 

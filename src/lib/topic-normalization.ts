@@ -1,8 +1,10 @@
 import { getProvider, extractJson } from './providers';
 
 export interface NormalizeContext {
-  area: string;
-  cargo: string;
+  tema: string[];
+  contexto: string;
+  descricao_livre: string;
+  objetivo: string;
 }
 
 /**
@@ -23,31 +25,38 @@ export async function normalizeTopics(
   if (cleanInput.length === 0) return [];
 
   try {
-    // Usa o provider de email (geralmente DeepSeek, mais barato) — tarefa não exige web search
     const provider = await getProvider(
       process.env.NORMALIZE_LLM_PROVIDER ?? process.env.EMAIL_LLM_PROVIDER,
     );
 
     const system = `Você normaliza tópicos digitados por usuários para uso como query em um modelo de curadoria com web search. Marcadores temporais, gírias e typos disparam alucinação no modelo de busca; sua saída precisa ser estável e factual.`;
 
+    const contextLine = [
+      `Tema(s) do usuário: ${ctx.tema.join(', ')}`,
+      `Contexto: ${ctx.contexto || 'não informado'}`,
+      ctx.descricao_livre ? `Sobre o usuário: ${ctx.descricao_livre}` : null,
+      ctx.objetivo ? `Objetivo: ${ctx.objetivo}` : null,
+    ]
+      .filter(Boolean)
+      .join('\n');
+
     const user = `CONTEXTO DO USUÁRIO:
-- Área: ${ctx.area}
-- Cargo: ${ctx.cargo}
+${contextLine}
 
 REGRAS:
-- Remova marcadores temporais ("hoje", "esta semana", "amanhã", "agora", datas específicas, "do momento", "atualmente").
+- Remova marcadores temporais ("hoje", "esta semana", "amanhã", "agora", datas, "do momento", "atualmente").
 - Corrija typos óbvios (ex: "cloude code" → "Claude Code", "Reactnative" → "React Native", "chat gpt" → "ChatGPT").
-- Mantenha tópicos específicos e factuais — NÃO generalize demais (ex: "React Native finance app" não vira só "React Native").
+- Mantenha tópicos específicos e factuais — NÃO generalize demais.
 - Preserve o idioma original (PT-BR fica PT-BR).
 - Cada tópico deve virar uma frase nominal de 2 a 12 palavras, sem perguntas, sem imperativos.
 - Se o tópico já está bom, devolva ele igual.
 - NÃO invente conceitos novos, NÃO adicione tópicos, NÃO remova tópicos.
+- Considere o contexto do usuário (Profissão/Estudo/Hobby/Curiosidade) pra decidir o registro: "Hobby" tolera termos coloquiais; "Profissão" prefere terminologia técnica.
 
 EXEMPLOS:
 - "novidades de ia hoje" → "Inteligência Artificial generativa e LLMs"
 - "cloude code" → "Claude Code (Anthropic CLI/SDK)"
 - "react native" → "React Native"
-- "o que tá rolando em IA esta semana" → "Inteligência Artificial: lançamentos, papers e produtos recentes"
 - "renderização em tempo real e experiências imersivas para clientes" → "Renderização em tempo real e experiências imersivas para clientes"
 - "drone fotogrametria" → "Drones e fotogrametria para levantamento de terreno"
 - "futuro do trabalho" → "Futuro do trabalho e transformação profissional"
@@ -77,7 +86,7 @@ A lista "normalized" deve ter EXATAMENTE ${cleanInput.length} elemento(s), na me
     const arr = parsed?.normalized;
     if (!Array.isArray(arr) || arr.length !== cleanInput.length) {
       console.warn(
-        `[normalizeTopics] resposta com tamanho errado (esperado ${cleanInput.length}, veio ${Array.isArray(arr) ? arr.length : 'não-array'}). Mantendo originais.`,
+        `[normalizeTopics] tamanho errado (esperado ${cleanInput.length}, veio ${Array.isArray(arr) ? arr.length : 'não-array'}). Mantendo originais.`,
       );
       return topics;
     }

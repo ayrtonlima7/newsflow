@@ -3,7 +3,7 @@
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
-import { questions } from '@/app/onboarding/questions';
+import { questions, type QuestionId } from '@/app/onboarding/questions';
 import { StepCard } from '@/app/onboarding/step-card';
 import { updateProfile, setActive, type ProfileUpdateInput } from './actions';
 
@@ -60,6 +60,8 @@ export function SettingsForm({ initial, isActive: initialActive }: Props) {
     });
   }
 
+  // Em /settings mostramos TODAS as perguntas (inclusive a condicional),
+  // pra o usuário editar livremente. A condicional só esconde no onboarding.
   return (
     <div className="space-y-8">
       <div className="flex items-center justify-between gap-4 rounded-lg border border-[var(--color-border)] bg-white p-5">
@@ -69,7 +71,7 @@ export function SettingsForm({ initial, isActive: initialActive }: Props) {
           </p>
           <p className="text-xs text-[var(--color-muted)]">
             {active
-              ? 'Os emails seguem sua frequência e horário configurados.'
+              ? 'Os emails seguem sua frequência configurada.'
               : 'Você não receberá novos emails até reativar.'}
           </p>
         </div>
@@ -88,18 +90,21 @@ export function SettingsForm({ initial, isActive: initialActive }: Props) {
         </button>
       </div>
 
-      {questions.map((q) => (
-        <div
-          key={q.id}
-          className="rounded-lg border border-[var(--color-border)] bg-white p-6"
-        >
-          <StepCard
-            question={q}
-            value={values[q.id]}
-            onChange={(v) => update(q.id, v as ProfileUpdateInput[typeof q.id])}
-          />
-        </div>
-      ))}
+      {questions.map((q) => {
+        const id = q.id as QuestionId;
+        return (
+          <div
+            key={id}
+            className="rounded-lg border border-[var(--color-border)] bg-white p-6"
+          >
+            <StepCard
+              question={q}
+              value={values[id] as string | string[]}
+              onChange={(v) => update(id, v as ProfileUpdateInput[typeof id])}
+            />
+          </div>
+        );
+      })}
 
       <div className="sticky bottom-4 z-10 flex flex-col gap-3 rounded-lg border border-[var(--color-border)] bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
         <div className="text-sm">

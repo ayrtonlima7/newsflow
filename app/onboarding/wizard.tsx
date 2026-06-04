@@ -1,32 +1,36 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import { questions } from './questions';
+import { questions, isQuestionShown, type QuestionId } from './questions';
 import { StepCard } from './step-card';
 import { ConfirmCard } from './confirm-card';
 import { generateTopicSuggestions } from './actions';
 import type { Profile } from '@/src/lib/types';
 
 type Answers = {
-  area: string;
-  cargo: string;
+  nome: string;
+  tema: string[];
+  contexto: string;
+  descricao_livre: string;
+  objetivo: string;
   topicos: string[];
+  referencias: string[];
+  formatos: string[];
   ignorar: string[];
   frequencia: string;
-  horario: string;
-  tom: string;
-  fontes_prioritarias: string[];
 };
 
 const empty: Answers = {
-  area: '',
-  cargo: '',
+  nome: '',
+  tema: [],
+  contexto: '',
+  descricao_livre: '',
+  objetivo: '',
   topicos: [],
+  referencias: [],
+  formatos: [],
   ignorar: [],
   frequencia: '',
-  horario: '',
-  tom: '',
-  fontes_prioritarias: [],
 };
 
 export function OnboardingWizard({ userEmail }: { userEmail: string }) {
@@ -37,9 +41,27 @@ export function OnboardingWizard({ userEmail }: { userEmail: string }) {
   const [topicsError, setTopicsError] = useState<string | null>(null);
   const [, startTransition] = useTransition();
 
-  const isConfirm = step === questions.length;
+  // Total de perguntas visíveis (varia com a pergunta condicional)
+  const visibleQuestions = questions.filter((q) =>
+    isQuestionShown(q, answers as Record<QuestionId, string | string[]>),
+  );
+  const isConfirm = step >= questions.length;
   const currentQuestion = isConfirm ? null : questions[step];
-  const currentValue = currentQuestion ? (answers as Record<string, string | string[]>)[currentQuestion.id] : '';
+
+  // Se o step atual cair em pergunta condicional não visível, pula automaticamente
+  // (raro mas pode acontecer se user voltar e mudar contexto)
+  if (currentQuestion && !isQuestionShown(currentQuestion, answers as Record<QuestionId, string | string[]>)) {
+    // próximo render avança
+    setTimeout(() => {
+      const nextVisible = findNextVisible(step + 1, answers);
+      if (nextVisible !== null) setStep(nextVisible);
+      else setStep(questions.length);
+    }, 0);
+  }
+
+  const currentValue = currentQuestion
+    ? (answers as Record<string, string | string[]>)[currentQuestion.id]
+    : '';
 
   function updateAnswer(value: string | string[]) {
     if (!currentQuestion) return;
@@ -48,36 +70,71 @@ export function OnboardingWizard({ userEmail }: { userEmail: string }) {
 
   function canAdvance(): boolean {
     if (!currentQuestion) return true;
+    if (!currentQuestion.required) return true;
     const v = (answers as Record<string, string | string[]>)[currentQuestion.id];
     if (currentQuestion.type === 'multi') {
-      const min = currentQuestion.minSelections ?? 0;
+      const min = currentQuestion.minSelections ?? 1;
       return Array.isArray(v) && v.length >= min;
     }
     return typeof v === 'string' && v.trim().length > 0;
   }
 
+  function findNextVisible(fromIndex: number, ans: Answers): number | null {
+    for (let i = fromIndex; i < questions.length; i++) {
+      if (isQuestionShown(questions[i], ans as Record<QuestionId, string | string[]>)) {
+        return i;
+      }
+    }
+    return null;
+  }
+
+  function findPrevVisible(fromIndex: number, ans: Answers): number | null {
+    for (let i = fromIndex; i >= 0; i--) {
+      if (isQuestionShown(questions[i], ans as Record<QuestionId, string | string[]>)) {
+        return i;
+      }
+    }
+    return null;
+  }
+
   async function next() {
     if (!canAdvance()) return;
 
-    // Antes de mostrar a pergunta 3 (índice 2), gerar tópicos dinâmicos
-    if (step === 1 && dynamicTopics.length === 0) {
+    const nextVisible = findNextVisible(step + 1, answers);
+    const nextQuestion = nextVisible !== null ? questions[nextVisible] : null;
+
+    // Trigger LLM topic suggestions ANTES de mostrar a pergunta `topicos`
+    if (
+      nextQuestion?.id === 'topicos' &&
+      nextQuestion.type === 'multi' &&
+      nextQuestion.dynamic &&
+      dynamicTopics.length === 0
+    ) {
       setLoadingTopics(true);
       setTopicsError(null);
       startTransition(async () => {
-        const { topics, error } = await generateTopicSuggestions(answers.area, answers.cargo);
+        const { topics, error } = await generateTopicSuggestions({
+          nome: answers.nome,
+          tema: answers.tema,
+          contexto: answers.contexto,
+          descricao_livre: answers.descricao_livre,
+          objetivo: answers.objetivo,
+        });
         if (error) setTopicsError(error);
         setDynamicTopics(topics);
         setLoadingTopics(false);
-        setStep(step + 1);
+        setStep(nextVisible!);
       });
       return;
     }
 
-    setStep(step + 1);
+    if (nextVisible !== null) setStep(nextVisible);
+    else setStep(questions.length);
   }
 
   function prev() {
-    if (step > 0) setStep(step - 1);
+    const prevVisible = findPrevVisible(step - 1, answers);
+    if (prevVisible !== null) setStep(prevVisible);
   }
 
   function jumpToStart() {
@@ -86,17 +143,30 @@ export function OnboardingWizard({ userEmail }: { userEmail: string }) {
 
   if (isConfirm) {
     const profile: Profile = {
-      ...answers,
-      descricoes_livres: {},
+      nome: answers.nome,
+      tema: answers.tema,
+      contexto: answers.contexto,
+      descricao_livre: answers.descricao_livre,
+      objetivo: answers.objetivo,
+      topicos: answers.topicos,
+      referencias: answers.referencias,
+      formatos: answers.formatos,
+      ignorar: answers.ignorar,
+      frequencia: answers.frequencia,
+      horario: '8h',
     };
     return <ConfirmCard profile={profile} onEdit={jumpToStart} />;
   }
+
+  // Numeração visível: posição da pergunta atual entre as visíveis
+  const visibleIndex = visibleQuestions.findIndex((q) => q.id === currentQuestion!.id);
+  const visibleTotal = visibleQuestions.length;
 
   return (
     <div className="space-y-8">
       <div className="flex items-center justify-between text-xs text-[var(--color-muted)]">
         <span>
-          Pergunta {step + 1} de {questions.length}
+          Pergunta {visibleIndex + 1} de {visibleTotal}
         </span>
         <span>{userEmail}</span>
       </div>
@@ -104,7 +174,7 @@ export function OnboardingWizard({ userEmail }: { userEmail: string }) {
       <div className="h-1 w-full overflow-hidden rounded-full bg-stone-200">
         <div
           className="h-full bg-[var(--color-fg)] transition-all"
-          style={{ width: `${((step + 1) / questions.length) * 100}%` }}
+          style={{ width: `${((visibleIndex + 1) / visibleTotal) * 100}%` }}
         />
       </div>
 
@@ -112,13 +182,13 @@ export function OnboardingWizard({ userEmail }: { userEmail: string }) {
         question={currentQuestion!}
         value={currentValue}
         onChange={updateAnswer}
-        loading={loadingTopics && step === 2}
+        loading={loadingTopics && currentQuestion!.id === 'topicos'}
         dynamicChips={dynamicTopics}
       />
 
-      {topicsError && step === 2 && (
+      {topicsError && currentQuestion!.id === 'topicos' && (
         <p className="text-sm text-amber-700">
-          {topicsError}. Você ainda pode adicionar tópicos manualmente abaixo.
+          {topicsError}. Você ainda pode adicionar tópicos manualmente.
         </p>
       )}
 
@@ -137,7 +207,7 @@ export function OnboardingWizard({ userEmail }: { userEmail: string }) {
           disabled={!canAdvance() || loadingTopics}
           className="rounded-md bg-[var(--color-accent)] px-6 py-2 text-sm font-medium text-[var(--color-accent-fg)] transition hover:opacity-90 disabled:opacity-40"
         >
-          {step === questions.length - 1 ? 'Revisar' : 'Próxima'}
+          {visibleIndex === visibleTotal - 1 ? 'Revisar' : 'Próxima'}
         </button>
       </div>
     </div>

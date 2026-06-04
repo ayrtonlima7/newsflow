@@ -5,7 +5,7 @@ import type { Profile } from '@/src/lib/types';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
-export const maxDuration = 120;
+export const maxDuration = 180;
 
 const SP_OFFSET_HOURS = -3;
 

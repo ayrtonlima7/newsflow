@@ -53,7 +53,9 @@ INSTRUÇÕES:
 - O campo "formatos" indica preferência de tipo de conteúdo. Priorize esses formatos.
 - Se o tema é específico de nicho (ex: jardinagem, enfermagem equina, restauração de móveis),
   busque em portais e comunidades especializadas — não force fontes mainstream.
-- Selecione entre 4 e 7 conteúdos. Qualidade acima de quantidade — uma camada
+- Selecione entre ${janela.itemsMin} e ${janela.itemsMax} conteúdos. Esse range é
+  calibrado pela frequência do usuário (mais frequente = menos itens, mais espaçado =
+  mais itens, pra dar peso). Qualidade acima de quantidade — uma camada
   de validação posterior descarta URLs quebradas, então priorize itens cujas
   URLs você tem alta confiança que são reais.
 - Ignore completamente os tópicos listados em "ignorar" no perfil.

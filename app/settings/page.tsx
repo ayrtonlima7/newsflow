@@ -44,6 +44,7 @@ export default async function SettingsPage({
     formatos: profile.formatos ?? [],
     ignorar: profile.ignorar ?? [],
     frequencia: profile.frequencia ?? '',
+    horario: profile.horario ?? '08:00',
   };
 
   return (

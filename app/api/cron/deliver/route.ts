@@ -13,22 +13,24 @@ function spHourNow(now: Date): number {
   return (now.getUTCHours() + SP_OFFSET_HOURS + 24) % 24;
 }
 
+/** Extrai a hora cheia de um horário em qualquer formato comum:
+ *  "08:00", "8:00", "08", "8", "8h", "20:30" (MM ignorado). */
 function parseHorario(horario: string): number | null {
-  const m = horario.match(/^(\d{1,2})\s*h?$/i);
+  const m = horario.trim().match(/^(\d{1,2})(?::\d{2})?\s*h?$/i);
   if (!m) return null;
   const h = Number(m[1]);
   return h >= 0 && h <= 23 ? h : null;
 }
 
+/** Intervalo mínimo entre entregas, baseado na frequência. Casa com o que
+ *  frequenciaParaJanela retorna em janelaDias. */
 function minIntervalMs(frequencia: string): number {
   const f = frequencia.toLowerCase();
-  if (f.includes('diari') || f.includes('todo dia') || f.includes('todos os dias')) {
-    return 23 * 3600_000;
+  if (f.includes('semana')) return 6 * 24 * 3600_000; // 6 dias (folga pra 7)
+  if (f.includes('3 dias') || f.includes('três dias') || f.includes('tres dias')) {
+    return 2.5 * 24 * 3600_000; // 2.5 dias (folga pra 3)
   }
-  if (f.includes('2x') || f.includes('duas vezes')) return 3 * 24 * 3600_000;
-  if (f.includes('3x') || f.includes('três vezes')) return 2 * 24 * 3600_000;
-  if (f.includes('semana')) return 6 * 24 * 3600_000;
-  // fallback conservador: 1 dia
+  // Default: diária — 23h dá folga pra rodar 1x/dia
   return 23 * 3600_000;
 }
 
@@ -44,12 +46,31 @@ function isDue(
 ): { due: true } | { due: false; reason: string } {
   if (!profile.is_active) return { due: false, reason: 'inativo' };
 
-  // NOTA: No Vercel Hobby, o cron só roda 1×/dia (configurado em vercel.json
-  // pra 11h UTC = 8h SP). Por isso a granularidade de horário do perfil
-  // (profile.horario) é IGNORADA aqui — todos recebem por volta das 8h SP.
-  // Quando upgradar pra Pro e o cron voltar a ser horário (`0 * * * *`),
-  // reativar a checagem `parseHorario(profile.horario) === spHourNow(now)`.
+  const targetHour = parseHorario(profile.horario);
+  if (targetHour === null) {
+    return { due: false, reason: `horário inválido: "${profile.horario}"` };
+  }
 
+  // Cron roda no minuto 45 UTC de cada hora via GitHub Actions, que pode
+  // atrasar 5-15min. Pra absorver isso, aceita janela de tolerância de ±1h:
+  // - currentSpHour + 1 (cron rodou no horário, prep pra próxima hora)
+  // - currentSpHour     (cron atrasou e tá na hora-alvo)
+  // - currentSpHour - 1 (cron atrasou muito; idempotência via last_delivered_at impede duplicata)
+  const currentSpHour = spHourNow(now);
+  const tolerantHours = [
+    (currentSpHour + 1) % 24,
+    currentSpHour,
+    (currentSpHour + 24 - 1) % 24,
+  ];
+  if (!tolerantHours.includes(targetHour)) {
+    return {
+      due: false,
+      reason: `hora SP atual ${currentSpHour}h, alvo do usuário ${targetHour}h (janela ${tolerantHours.join('/')}h)`,
+    };
+  }
+
+  // Idempotência: respeitar frequência (não mandar 2 emails na mesma janela
+  // — protege contra GitHub Actions firing 2x ou cron atrasado).
   if (profile.last_delivered_at) {
     const last = new Date(profile.last_delivered_at).getTime();
     const diff = now.getTime() - last;

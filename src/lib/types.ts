@@ -68,7 +68,7 @@ export interface EmailOutput {
 
 export interface JanelaFrescor {
   /** Janela em dias. Conteúdo mais antigo que isso é REJEITADO. Casa exatamente
-   *  com a cadência de entrega: diária → 1, semanal → 7. */
+   *  com a cadência de entrega: diária → 1, 3-day → 3, semanal → 7. */
   janelaDias: number;
   /** Texto pro prompt descrevendo a janela. */
   rotulo: string;
@@ -76,6 +76,10 @@ export interface JanelaFrescor {
   todayISO: string;
   /** Data limite em YYYY-MM-DD — tudo publicado antes disso é rejeitado. */
   cutoffISO: string;
+  /** Mínimo de itens pedido ao modelo. Inclui buffer pra validação derrubar alguns. */
+  itemsMin: number;
+  /** Máximo de itens pedido ao modelo. */
+  itemsMax: number;
 }
 
 export function frequenciaParaJanela(frequencia: string): JanelaFrescor {
@@ -83,18 +87,41 @@ export function frequenciaParaJanela(frequencia: string): JanelaFrescor {
   const todayISO = today.toISOString().split('T')[0];
 
   const f = frequencia.toLowerCase();
-  // Janela = cadência de entrega. Se o usuário recebe semanal, o gap útil é 7 dias.
-  // Se recebe diário, é 1 dia. Sem padding com conteúdo velho.
-  const janelaDias = f.includes('semana') ? 7 : 1;
+
+  // Janela em dias + quantidade alvo de itens.
+  // Quantidades incluem buffer pra validação dropar alguns; usuário recebe ~60-80%.
+  let janelaDias = 1;
+  let itemsMin = 5;
+  let itemsMax = 8;
+
+  if (f.includes('semana')) {
+    janelaDias = 7;
+    itemsMin = 10;
+    itemsMax = 15;
+  } else if (
+    f.includes('3 dias') ||
+    f.includes('três dias') ||
+    f.includes('tres dias')
+  ) {
+    janelaDias = 3;
+    itemsMin = 7;
+    itemsMax = 10;
+  }
 
   const cutoff = new Date(today.getTime() - janelaDias * 24 * 60 * 60 * 1000);
   const cutoffISO = cutoff.toISOString().split('T')[0];
 
+  let rotulo: string;
+  if (janelaDias === 1) rotulo = 'últimas 24 horas';
+  else rotulo = `últimos ${janelaDias} dias`;
+
   return {
     janelaDias,
-    rotulo: janelaDias === 1 ? 'últimas 24 horas' : `últimos ${janelaDias} dias`,
+    rotulo,
     todayISO,
     cutoffISO,
+    itemsMin,
+    itemsMax,
   };
 }
 

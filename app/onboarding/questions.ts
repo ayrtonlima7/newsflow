@@ -9,7 +9,8 @@ export type QuestionId =
   | 'referencias'
   | 'formatos'
   | 'ignorar'
-  | 'frequencia';
+  | 'frequencia'
+  | 'horario';
 
 type BaseQuestion = {
   id: QuestionId;
@@ -168,9 +169,19 @@ export const questions: Question[] = [
     id: 'frequencia',
     type: 'single',
     question: 'Com que frequência quer receber?',
-    helper: 'Pode mudar depois nas configurações.',
-    chips: ['Uma vez por semana', 'Todo dia de manhã'],
+    helper: 'Pode mudar depois nas configurações. Mais frequente = email mais enxuto e fresco; mais espaçado = email mais denso.',
+    chips: ['Todo dia', 'A cada 3 dias', 'Uma vez por semana'],
     allowFree: false,
+    required: true,
+  },
+  {
+    id: 'horario',
+    type: 'single',
+    question: 'Que horário você prefere receber?',
+    helper: 'Hora cheia (HH:00). Pode escolher um dos sugeridos ou digitar outro.',
+    chips: ['06:00', '08:00', '12:00', '18:00', '21:00'],
+    allowFree: true,
+    placeholder: 'Ex: 14:00, 22:00...',
     required: true,
   },
 ];

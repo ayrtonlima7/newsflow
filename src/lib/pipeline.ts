@@ -7,9 +7,9 @@ import { recoverUrlsFromGrounding } from './url-recovery';
 import type { Profile, Briefing, BriefingItem, EmailOutput } from './types';
 import { frequenciaParaJanela } from './types';
 
+// Limite absoluto pra triggar retry: se o email final ficar abaixo disso,
+// vale a pena gastar mais tokens pra encher. Acima disso, aceita o resultado.
 const MIN_VALID_ITEMS = 3;
-const TARGET_MIN = 4;
-const TARGET_MAX = 7;
 
 export interface PipelineUsage {
   inputTokens: number;
@@ -219,6 +219,7 @@ async function retryCurate(
   const provider = await getProvider();
   if (!provider.supportsWebSearch) return null;
 
+  const retryTargetJanela = frequenciaParaJanela(profile.frequencia);
   const { system, user } = buildRetryCuratePrompt(profile, {
     validItems,
     brokenItems: droppedItems.map((d) => ({
@@ -226,8 +227,8 @@ async function retryCurate(
       url: d.item.url,
       reason: d.reason,
     })),
-    targetMin: TARGET_MIN,
-    targetMax: TARGET_MAX,
+    targetMin: retryTargetJanela.itemsMin,
+    targetMax: retryTargetJanela.itemsMax,
   });
 
   const t0 = Date.now();

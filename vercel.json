@@ -1,3 +1,4 @@
 {
+  "$comment": "Crons agora rodam via GitHub Actions (.github/workflows/cron-deliver.yml). Não precisa de Vercel Pro pra cron horário — GitHub Actions é free com pequena variância de timing (5-15min), absorvida pela janela de tolerância em /api/cron/deliver.",
   "crons": []
 }

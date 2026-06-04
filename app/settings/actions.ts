@@ -18,6 +18,7 @@ export interface ProfileUpdateInput {
   formatos: string[];
   ignorar: string[];
   frequencia: string;
+  horario: string;
 }
 
 export async function updateProfile(
@@ -50,6 +51,9 @@ export async function updateProfile(
   if (!input.frequencia?.trim()) {
     return { ok: false, error: 'escolha uma frequência' };
   }
+  if (!input.horario?.trim()) {
+    return { ok: false, error: 'escolha um horário' };
+  }
 
   const topicos_busca = await normalizeTopics(input.topicos, {
     tema: input.tema,
@@ -72,6 +76,7 @@ export async function updateProfile(
       formatos: input.formatos,
       ignorar: input.ignorar ?? [],
       frequencia: input.frequencia,
+      horario: input.horario.trim(),
     })
     .eq('user_id', user.id);
 

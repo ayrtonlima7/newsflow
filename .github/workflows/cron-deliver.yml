@@ -1,0 +1,47 @@
+name: NewsFlow cron — deliver emails
+
+# Roda de hora em hora pra processar usuários elegíveis.
+# Notas:
+# - GitHub Actions schedule pode atrasar 5-15min em horários de pico.
+# - O endpoint /api/cron/deliver tem tolerância de ±1h pra absorver isso.
+# - Cada run consome ~30s do quota GitHub (720 runs/mês ≈ 360 min — bem dentro do limite free).
+
+on:
+  # Minuto 45 de cada hora UTC. Combinado com a tolerância no isDue,
+  # cobre usuários que escolheram horário cheio (HH:00) com margem.
+  schedule:
+    - cron: '45 * * * *'
+  # Permite trigger manual via GitHub UI ("Run workflow" no menu da action).
+  workflow_dispatch:
+
+jobs:
+  deliver:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Trigger NewsFlow delivery endpoint
+        env:
+          APP_URL: ${{ secrets.APP_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          if [ -z "$APP_URL" ] || [ -z "$CRON_SECRET" ]; then
+            echo "::error::Faltam secrets APP_URL e/ou CRON_SECRET no repositório"
+            exit 1
+          fi
+
+          echo "📬 Disparando cron em $APP_URL/api/cron/deliver"
+          response=$(curl -sS -w "\n%{http_code}" \
+            -X GET "$APP_URL/api/cron/deliver" \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            --max-time 120)
+
+          http_code=$(echo "$response" | tail -n1)
+          body=$(echo "$response" | sed '$d')
+
+          echo "HTTP $http_code"
+          echo "$body" | head -100
+
+          if [ "$http_code" -ne 200 ]; then
+            echo "::error::Endpoint retornou HTTP $http_code"
+            exit 1
+          fi

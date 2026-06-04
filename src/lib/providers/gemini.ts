@@ -27,7 +27,7 @@ async function withRetry<T>(fn: () => Promise<T>, maxAttempts = 4): Promise<T> {
 export function createGeminiProvider(): LLMProvider {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new Error('GEMINI_API_KEY ausente no .env.local');
-  const model = process.env.GEMINI_MODEL ?? 'gemini-2.5-pro';
+  const model = process.env.GEMINI_MODEL ?? 'gemini-2.5-flash';
   const client = new GoogleGenAI({ apiKey });
 
   return {

@@ -38,19 +38,21 @@ export async function generateBriefing(
 ): Promise<{ briefing: Briefing; meta: PipelineMeta }> {
   const janela = frequenciaParaJanela(profile.frequencia);
   const t0 = Date.now();
+  const since = () => `${((Date.now() - t0) / 1000).toFixed(1)}s`;
 
   // --- Passo 1: busca real via Tavily ---
   const queries = buildSearchQueries(profile);
   if (queries.length === 0) {
     throw new Error('curate: nenhuma query de busca derivada do perfil');
   }
+  const tTavily = Date.now();
   const rawResults = await tavilySearchMany(queries, {
     days: janela.janelaDias,
     maxResults: 8,
     topic: 'news',
   });
   console.log(
-    `[curate] Tavily: ${queries.length} query(s) → ${rawResults.length} resultado(s) único(s)`,
+    `[timing] Tavily (${queries.length} queries): ${((Date.now() - tTavily) / 1000).toFixed(1)}s → ${rawResults.length} resultados | total ${since()}`,
   );
 
   if (rawResults.length === 0) {
@@ -75,6 +77,7 @@ export async function generateBriefing(
     process.env.CURATE_LLM_PROVIDER ?? process.env.LLM_PROVIDER,
   );
   const { system, user } = buildCurateFromResultsPrompt(profile, rawResults);
+  const tCurate = Date.now();
   const result = await provider.complete({
     system,
     messages: [{ role: 'user', content: user }],
@@ -82,6 +85,9 @@ export async function generateBriefing(
     maxTokens: 8192,
     jsonMode: true,
   });
+  console.log(
+    `[timing] DeepSeek curate (${provider.model}): ${((Date.now() - tCurate) / 1000).toFixed(1)}s | out=${result.usage.outputTokens}tok | total ${since()}`,
+  );
   const elapsedSeconds = (Date.now() - t0) / 1000;
   if (!result.text.trim()) {
     throw new Error('curate: resposta vazia do modelo');
@@ -110,7 +116,11 @@ export async function generateBriefing(
   // --- Validação LENIENTE só dos selecionados (~7, não 32) ---
   // Tavily já garante URL real; só descartamos link genuinamente morto (404/410/
   // DNS/recusado). 403/401/timeout = mantém (site bloqueia bot mas abre no browser).
+  const tValidate = Date.now();
   const { kept, deadDropped } = await validateSelectedLeniently(freshItems);
+  console.log(
+    `[timing] validação leniente (${freshItems.length} links): ${((Date.now() - tValidate) / 1000).toFixed(1)}s | total ${since()}`,
+  );
   if (deadDropped.length > 0) {
     console.warn(`[curate] ${deadDropped.length} item(s) descartado(s) por link morto:`);
     for (const d of deadDropped) {
@@ -205,6 +215,9 @@ export async function generateEmail(
     jsonMode: true,
   });
   const elapsedSeconds = (Date.now() - t0) / 1000;
+  console.log(
+    `[timing] DeepSeek email gen (${provider.model}): ${elapsedSeconds.toFixed(1)}s | out=${result.usage.outputTokens}tok`,
+  );
   if (!result.text.trim()) {
     throw new Error('email: resposta vazia do modelo');
   }

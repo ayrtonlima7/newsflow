@@ -1,5 +1,4 @@
 import type { BriefingItem, UrlStatus } from './types';
-import type { SearchResult } from './search';
 
 export interface DroppedItem {
   item: BriefingItem;
@@ -290,33 +289,60 @@ async function validateHackerNews(parsed: URL): Promise<{ ok: boolean; reason: s
 }
 
 /**
- * Filtra resultados da Tavily deixando só os que ABREM de verdade num browser.
- * Usado ANTES de mandar pro LLM curar — assim o modelo só escolhe URLs que
- * funcionam, e não precisamos de degradação (com 32 resultados, dá pra ser
- * exigente e descartar os quebrados).
+ * Validação LENIENTE dos itens já selecionados pelo LLM (~7, não 32).
+ * Tavily já garante que a URL é real (veio do índice dela), então só
+ * descartamos links GENUINAMENTE mortos:
+ *   - placeholder / URL malformada
+ *   - 404 / 410 (página não existe / foi removida)
+ *   - erro de rede (DNS não resolve, conexão recusada)
  *
- * Faz HEAD com UA de browser; se 405/403/501, tenta GET parcial. Qualquer
- * 2xx/3xx = ok. Resto = descarta.
+ * Mantém 403/401/405/429/timeout: esses são sites que bloqueiam bots mas
+ * ABREM no browser do usuário — descartá-los seria falso-negativo.
  */
-export async function filterReachableResults(
-  results: SearchResult[],
-): Promise<{ reachable: SearchResult[]; droppedCount: number }> {
-  const checks = await Promise.all(
-    results.map(async (r) => {
-      if (PLACEHOLDER_PATTERN.test(r.url)) return false;
-      try {
-        const parsed = new URL(r.url);
-        if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return false;
-        const check = await validateGeneric(r.url);
-        return check.ok;
-      } catch {
-        return false;
-      }
-    }),
-  );
+export async function validateSelectedLeniently<T extends { url: string; titulo: string }>(
+  items: T[],
+): Promise<{ kept: T[]; deadDropped: { item: T; reason: string }[] }> {
+  const checks = await Promise.all(items.map((it) => isDeadLink(it.url)));
+  const kept: T[] = [];
+  const deadDropped: { item: T; reason: string }[] = [];
+  items.forEach((item, i) => {
+    const dead = checks[i];
+    if (dead) deadDropped.push({ item, reason: dead });
+    else kept.push(item);
+  });
+  return { kept, deadDropped };
+}
 
-  const reachable = results.filter((_, i) => checks[i]);
-  return { reachable, droppedCount: results.length - reachable.length };
+/** Retorna o motivo se o link está MORTO, ou null se está ok (ou apenas bloqueado p/ bot). */
+async function isDeadLink(url: string): Promise<string | null> {
+  if (typeof url !== 'string' || !url.trim()) return 'URL vazia';
+  if (PLACEHOLDER_PATTERN.test(url)) return 'placeholder/template';
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return 'URL malformada';
+  }
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    return `protocolo inválido: ${parsed.protocol}`;
+  }
+
+  try {
+    const res = await fetchWithTimeout(url, {
+      method: 'HEAD',
+      redirect: 'follow',
+      headers: { 'user-agent': USER_AGENT, accept: '*/*' },
+    });
+    // Mortos de verdade
+    if (res.status === 404 || res.status === 410) return `HTTP ${res.status}`;
+    // Tudo o mais (2xx/3xx ok; 403/401/405/429/5xx = bloqueio de bot ou transitório → mantém)
+    return null;
+  } catch (err) {
+    // Erro de rede: DNS não resolve / conexão recusada = morto. Timeout = mantém (transitório).
+    const msg = err instanceof Error ? err.message : String(err);
+    if (/abort|timeout/i.test(msg)) return null; // timeout não é morte definitiva
+    return `inacessível: ${msg}`;
+  }
 }
 
 export async function validateBriefingUrls(items: BriefingItem[]): Promise<ValidationReport> {

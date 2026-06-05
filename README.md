@@ -11,7 +11,7 @@ teasers), escritos como alguém que leu tudo e está te repassando o que importa
 
 ## Stack & serviços externos
 
-O produto depende de **6 serviços externos** ativos:
+O produto depende de **6 serviços de runtime** + GitHub (repositório):
 
 | Serviço | Função | Plano atual |
 |---|---|---|
@@ -19,8 +19,9 @@ O produto depende de **6 serviços externos** ativos:
 | **Supabase** | Banco de dados **+ autenticação** (magic link) | Free |
 | **Resend** | Envio de emails (curadoria **e** magic links de login) | Free |
 | **Tavily** | Busca web (acha os artigos reais e frescos) | Free (1.000 buscas/mês) |
-| **DeepSeek** | LLM — curadoria, geração do email, normalização de tópicos | Pré-pago (créditos / top-up) |
-| **GitHub** | Repositório + **GitHub Actions** (dispara o cron de hora em hora) | Free |
+| **DeepSeek** | LLM — curadoria + conteúdo do email + normalização de tópicos | Pré-pago (créditos / top-up) |
+| **cron-job.org** | Dispara o cron (bate em `/api/cron/deliver` a cada 30min) | Free |
+| **GitHub** | Repositório do código (deploy automático na Vercel) | Free |
 
 > **Dormente:** Gemini (`GEMINI_API_KEY`) ainda está nas envs como fallback, mas
 > não é usado no pipeline atual.
@@ -36,21 +37,27 @@ Next.js 15 (App Router) · React 19 · Tailwind 4 · TypeScript
 ## Como funciona (pipeline)
 
 ```
-GitHub Actions (cron, a cada hora no minuto 45 UTC)
+cron-job.org (a cada 30min)
   → POST /api/cron/deliver (auth via CRON_SECRET)
-      → Supabase: lê perfis ativos cujo horário bate (janela de tolerância ±1h)
+      → Supabase: lê perfis ativos cujo horário bate (tolerância ±1h)
+        + idempotência por período (não reenvia se já entregou no dia/janela)
       → Para cada usuário "due":
           1. Tavily busca (1 query por tópico) → artigos reais + datas
-          2. Valida que os links abrem (UA de browser) → descarta quebrados
-          3. DeepSeek seleciona os melhores + escreve resumos densos → briefing
-          4. Filtro de frescor (descarta fora da janela de tempo)
-          5. DeepSeek gera o HTML do email
+          2. UMA chamada DeepSeek: seleciona os melhores E escreve o conteúdo
+             final (assunto, intro, corpo na voz "amigo investido") → briefing
+          3. Filtro de frescor (descarta fora da janela de tempo)
+          4. Validação leniente dos ~7 selecionados (só descarta link morto)
+          5. Monta o HTML em código (template fixo, sem LLM)
           6. Resend envia
           7. Supabase grava o delivery + atualiza last_delivered_at
 ```
 
 **Garantia anti-alucinação:** o LLM só pode usar URLs que vieram da Tavily. Se
 inventar um link, é descartado. Por isso os links sempre são reais.
+
+**Curate + email foram fundidos em 1 chamada LLM** (era 2). O HTML é montado em
+código (`src/lib/email-template.ts`), não pelo LLM — mais rápido, mais barato e
+consistente.
 
 **Frequências e janelas de frescor:**
 
@@ -60,7 +67,7 @@ inventar um link, é descartado. Por isso os links sempre são reais.
 | A cada 3 dias | últimos 3 dias | 7-10 |
 | Semanal | últimos 7 dias | 10-15 |
 
-**Custo medido:** ~R$ 0,035 por email (só DeepSeek; Tavily no free tier).
+**Custo medido:** ~R$ 0,020 por email · **pipeline ~22s** (Tavily ~1s + DeepSeek ~18s + validação ~1s).
 
 ---
 
@@ -106,8 +113,8 @@ Veja `.env.example` para a lista completa. As críticas:
 | `npm run dev` | Servidor de desenvolvimento |
 | `npm run build` | Build de produção |
 | `npm run typecheck` | Checa tipos (tsc --noEmit) |
-| `npm run curate -- [perfil.json]` | Gera briefing via CLI (fixtures/profile.json) |
-| `npm run email -- [briefing.json]` | Renderiza email a partir de um briefing |
+| `npm run curate -- [perfil.json]` | Gera briefing via pipeline real (Tavily+DeepSeek) |
+| `npm run email -- [briefing.json]` | Monta o HTML do email a partir de um briefing (template, sem LLM) |
 | `npm run deliver -- <email\|user_id> [--dry]` | Pipeline completo pra um usuário real do banco |
 | `npm run preview -- [delivery_id]` | Abre o HTML de um delivery no browser |
 | `npm run reset-users` | ⚠️ Apaga TODOS os usuários e dados (reset do beta) |
@@ -117,8 +124,9 @@ Veja `.env.example` para a lista completa. As críticas:
 ## Deploy
 
 - **Site:** push pra `main` → Vercel deploya automático.
-- **Cron:** GitHub Actions (`.github/workflows/cron-deliver.yml`) roda no minuto 45
-  de cada hora. Precisa dos secrets `APP_URL` e `CRON_SECRET` no repositório.
+- **Cron:** **cron-job.org** bate em `https://<app>/api/cron/deliver` a cada 30min,
+  com header `Authorization: Bearer <CRON_SECRET>` configurado no dashboard dele.
+  (GitHub Actions foi abandonado — descartava execuções silenciosamente.)
 - **Migrações:** SQL em `supabase/migrations/`, aplicadas manualmente no SQL Editor
   do Supabase (não há CLI configurado).
 

@@ -35,12 +35,12 @@ curl -H "Authorization: Bearer $CRON_SECRET" \
 
 Next.js 15 App Router + React 19 + Tailwind 4 + Supabase + Resend. **Search via Tavily, LLM via DeepSeek.** TS path alias `@/*` resolves to repo root.
 
-**External services (6 active):** Vercel (host) · Supabase (DB + auth) · Resend (email send + auth magic-link relay) · Tavily (web search) · DeepSeek (LLM) · GitHub Actions (hourly cron). Gemini is dormant (key kept as fallback, not used in the pipeline).
+**External services (6 active):** Vercel (host) · Supabase (DB + auth) · Resend (email send + auth magic-link relay) · Tavily (web search) · DeepSeek (LLM) · cron-job.org (hourly cron, external). Gemini is dormant (key kept as fallback, not used). DeepSeek is **prepaid** (top-up balance) — if it hits zero, the pipeline fails (monitor it).
 
 ### Directory split
 
 - `app/` — Next routes, server actions, pages (`/login`, `/onboarding`, `/settings`, `/admin`, plus `app/api/*` and `app/auth/confirm`). `app/api/dev/preview/[id]` serves delivery HTML in dev only.
-- `src/` — non-Next code: `cli/` scripts, `prompts/` (curate/email), `lib/` (pipeline, delivery, providers, **search**, types, pricing, url-validation, url-recovery, topic-normalization, admin-stats).
+- `src/` — non-Next code: `cli/` scripts, `prompts/` (just `curate.ts`), `lib/` (pipeline, delivery, providers, **search**, **email-template**, types, pricing, url-validation, topic-normalization, admin-stats).
 - `lib/supabase/` — three Supabase clients (browser, server-RSC, admin/service-role). Path is `@/lib/supabase/...`.
 - `supabase/migrations/` — SQL migrations applied manually via Supabase SQL editor. `supabase/scripts/` — one-off SQL (e.g. reset).
 - `fixtures/` — sample profile JSON for local CLI runs.
@@ -51,23 +51,26 @@ Next.js 15 App Router + React 19 + Tailwind 4 + Supabase + Resend. **Search via 
 
 `getProvider(name?)` returns an `LLMProvider` with unified `complete()` and a `supportsWebSearch` flag. Selection order: explicit arg → `LLM_PROVIDER` env → `'gemini'` (but `LLM_PROVIDER=deepseek` in practice). Anthropic is stubbed (removed from deps). Provider usage:
 
-- **Curate** uses `CURATE_LLM_PROVIDER` → `LLM_PROVIDER` (DeepSeek). **No web search needed** — it receives Tavily results.
-- **Email** uses `EMAIL_LLM_PROVIDER` → `LLM_PROVIDER` (DeepSeek).
+- **Curate** uses `CURATE_LLM_PROVIDER` → `LLM_PROVIDER` (DeepSeek). No web search — it receives Tavily results.
 - **Topic normalization** uses `NORMALIZE_LLM_PROVIDER` → `EMAIL_LLM_PROVIDER` → `LLM_PROVIDER`.
+- Email generation does **NOT** call an LLM anymore (see Pipeline below) — the HTML is built in code.
 
-`extractJson()` strips fences and brace-matches the first JSON object/array — providers wrap JSON in markdown despite instructions. `jsonMode: true` is used for curate/email.
+`extractJson()` strips fences and brace-matches the first JSON object/array — providers wrap JSON in markdown despite instructions. `jsonMode: true` is used for the curate call.
 
 ### Pipeline (`src/lib/pipeline.ts` + `src/lib/delivery.ts`)
 
-`generateBriefing(profile)` runs in 2 steps + filters:
+Curate and email generation were **merged into a single LLM call** (was 2). `generateBriefing(profile)`:
 1. **Tavily search** — `buildSearchQueries()` makes 1 query per topic (cap 6); `tavilySearchMany()` runs them in parallel, dedupes by URL. `topic:news`, `days = janela.janelaDias`.
-2. **Reachability filter** — `filterReachableResults()` HEAD/GET-checks each result with a **browser user-agent** (bot UA gets refused by big portals like AOL). Broken links are dropped here, BEFORE the LLM sees them. With ~32 results and a 5-8 item target, we can afford to drop aggressively (no degradation).
-3. **DeepSeek curate** — `buildCurateFromResultsPrompt()` passes the reachable results; the LLM selects the best and writes dense summaries. **Anti-hallucination guard:** items whose URL is NOT in the Tavily result set are filtered out (the model may only use provided URLs).
-4. **Freshness backstop** — `filterByFreshness()` drops items whose `data_publicacao` is outside the window.
-5. `generateEmail(profile, briefing)` — separate DeepSeek call (`jsonMode: true`) → `{ assunto, html }`. The email prompt renders `urlStatus` (all `verified` now since validation happens upfront).
-6. `runDeliveryPipeline()` (in `delivery.ts`) orchestrates against the DB: inserts `briefings` row, then `deliveries` row (`pending` → `sent`/`failed`/`skipped`), substitutes `{{FEEDBACK_URL_YES/NO}}`, sends via Resend (with `List-Unsubscribe` RFC 8058 headers), updates `profiles.last_delivered_at`. Cost accumulated across both LLM calls (~R$0.035/email measured) stored in `briefings.meta`.
+2. **One DeepSeek call** — `buildCurateFromResultsPrompt()` passes ALL raw Tavily results; the LLM selects the best AND writes the final content in the "amigo investido" voice: `assunto` (subject), `intro` (greeting), and per item `{titulo, fonte, url, data_publicacao, relevancia, corpo}` where `corpo` is the voiced 6-10 line body (relevance woven in). **No HTML is generated by the LLM.**
+3. **Anti-hallucination guard** — items whose URL is NOT in the Tavily result set are dropped (the model may only use provided URLs).
+4. **Freshness backstop** — `filterByFreshness()` drops items whose `data_publicacao` is older than the cutoff.
+5. **Lenient link validation** — `validateSelectedLeniently()` HEAD-checks ONLY the ~7 selected items (not all 32) with a browser UA, AFTER selection. Drops only genuinely dead links (404/410/DNS-fail/refused); **keeps 403/401/timeout** (sites that block bots but open fine in a browser → avoids false-negatives). This is fast (~1s).
 
-Note: `url-recovery.ts` (grounding-citation recovery) and `buildCuratePrompt`/`buildRetryCuratePrompt` are **legacy from the Gemini era** — no longer wired into the pipeline. Kept for reference; safe to delete.
+`generateEmail(profile, briefing)` does **NOT call an LLM** — it just runs `renderEmailHtml(briefing)` (`src/lib/email-template.ts`), a fixed HTML template with `{{FEEDBACK_URL_YES/NO}}` placeholders. Returns `{ assunto, html }`. This is the base for the visual identity work.
+
+`runDeliveryPipeline()` (in `delivery.ts`) orchestrates against the DB: inserts `briefings` row, then `deliveries` row (`pending` → `sent`/`failed`/`skipped`), substitutes the feedback placeholders, sends via Resend (with `List-Unsubscribe` RFC 8058 headers), updates `profiles.last_delivered_at`. Cost (~R$0.020/email measured; one LLM call only) stored in `briefings.meta`.
+
+**Measured perf:** full pipeline ~22s (Tavily ~1s + DeepSeek curate ~18s + validation ~1s). The `[timing]` console logs print each phase.
 
 ### Frequency → window & item count (`frequenciaParaJanela` in `types.ts`)
 
@@ -87,9 +90,15 @@ The onboarding was redesigned from "professional-centric" (area/cargo/tom) to "i
 
 ### Cron / scheduling
 
-`app/api/cron/deliver/route.ts` requires `Authorization: Bearer $CRON_SECRET`. **The cron runs via GitHub Actions** (`.github/workflows/cron-deliver.yml`, schedule `45 * * * *` UTC) — NOT Vercel cron (`vercel.json` has `crons: []` to avoid the Hobby 1×/day limit). GH Actions needs repo secrets `APP_URL` + `CRON_SECRET`. GH Actions timing drifts 5-15min, so `isDue()` accepts a **±1h tolerance window**: a user's `horario` matches if it's in `[currentSpHour+1, currentSpHour, currentSpHour-1]` (SP = UTC-3). Idempotency via `last_delivered_at` + per-frequency `minIntervalMs` prevents duplicate sends. `horario` is parsed loosely (`08:00`, `8h`, `8` all → hour 8).
+`app/api/cron/deliver/route.ts` requires `Authorization: Bearer $CRON_SECRET`. **The cron runs via cron-job.org** (external service, free, hits the endpoint every 30min with the Authorization header configured in its dashboard). It replaced GitHub Actions, which **silently dropped scheduled runs** (best-effort, unreliable). `vercel.json` has `crons: []` (no Vercel cron — Hobby caps at 1×/day). The GH Actions workflow (`.github/workflows/cron-deliver.yml`) still exists but should be disabled.
 
-⚠️ Known limit: Vercel Hobby caps functions at 60s; the Tavily+DeepSeek pipeline runs ~35-70s, so with several users a cron run can time out. Mitigations for scale: Vercel Pro (300s), per-user pagination, or a more reliable external cron.
+`isDue()` logic:
+- **Hour match with ±1h tolerance** (cron-job.org + GH Actions can drift): user's `horario` matches if it's in `[currentSpHour+1, currentSpHour, currentSpHour-1]` (SP = UTC-3). `horario` parsed loosely (`08:00`, `8h`, `8` → 8).
+- **Idempotency by calendar period** (`alreadyDeliveredThisPeriod`): daily → already delivered same SP calendar day; 3-day → within 2.5 days; weekly → within 6 days. This is by PERIOD, not "X hours since last" — so a manual test yesterday doesn't block today's scheduled send.
+
+⚠️ Known limits:
+- cron-job.org free tier has a **30s request timeout**. The pipeline now runs ~22s (after the curate+email merge), under the limit. If it creeps back up, cron-job.org marks "timeout" but the Vercel function still completes (email sends) — idempotency prevents a duplicate on retry.
+- Vercel Hobby caps functions at 60s. At ~22s/user **sequential**, 2 users at the same hour ≈ 44s (ok), 3+ risks timeout. Fix for scale: per-user invocation (fan-out) or a queue (Upstash QStash).
 
 ### Auth & RLS
 

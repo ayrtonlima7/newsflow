@@ -1,17 +1,14 @@
 name: NewsFlow cron — deliver emails
 
-# Roda de hora em hora pra processar usuários elegíveis.
-# Notas:
-# - GitHub Actions schedule pode atrasar 5-15min em horários de pico.
-# - O endpoint /api/cron/deliver tem tolerância de ±1h pra absorver isso.
-# - Cada run consome ~30s do quota GitHub (720 runs/mês ≈ 360 min — bem dentro do limite free).
+# DESATIVADO como cron automático. O agendamento agora roda via cron-job.org
+# (GitHub Actions descartava execuções silenciosamente — não confiável).
+# Mantido só pra trigger MANUAL (workflow_dispatch) como backup de emergência.
+#
+# Pra reativar o schedule (não recomendado): descomente o bloco `schedule` abaixo.
 
 on:
-  # Minuto 45 de cada hora UTC. Combinado com a tolerância no isDue,
-  # cobre usuários que escolheram horário cheio (HH:00) com margem.
-  schedule:
-    - cron: '45 * * * *'
-  # Permite trigger manual via GitHub UI ("Run workflow" no menu da action).
+  # schedule:
+  #   - cron: '45 * * * *'
   workflow_dispatch:
 
 jobs:

@@ -43,21 +43,25 @@ export type UrlStatus = 'verified' | 'fallback' | 'source-only';
 export interface BriefingItem {
   titulo: string;
   fonte: string;
-  /** URL final usada — pode ser a original (verified), parent (fallback) ou origem (source-only). */
+  /** URL real (vinda da Tavily). */
   url: string;
-  /** Status de verificação. Email gen usa pra decidir como renderizar o link. */
+  /** Status de verificação. Sempre 'verified' no fluxo atual (validação leniente). */
   urlStatus?: UrlStatus;
-  /** Quando urlStatus !== 'verified', guarda a URL original que o modelo gerou (pra debug/log). */
   urlOriginal?: string;
-  /** Data de publicação do conteúdo no formato YYYY-MM-DD. Obrigatório pro filtro de frescor. */
+  /** Data de publicação do conteúdo no formato YYYY-MM-DD. */
   data_publicacao: string;
   relevancia: Relevancia;
-  motivo_relevancia: string;
-  resumo: string;
+  /** Corpo já na voz final ("amigo investido"), 6-10 linhas, com a relevância
+   *  pro usuário embutida no texto. É isso que vai pro HTML do email. */
+  corpo: string;
 }
 
 export interface Briefing {
   data_referencia: string;
+  /** Assunto do email (gerado junto com a curadoria). */
+  assunto?: string;
+  /** Linha de abertura do email (saudação + contexto do dia). */
+  intro?: string;
   itens: BriefingItem[];
 }
 

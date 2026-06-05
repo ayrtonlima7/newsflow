@@ -2,96 +2,43 @@ import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { getProvider, extractJson } from '../lib/providers/index';
-import { buildEmailPrompt } from '../prompts/email';
-import { calculateCost, formatCost } from '../lib/pricing';
-import type { Briefing, EmailOutput, Profile } from '../lib/types';
+import { renderEmailHtml } from '../lib/email-template';
+import type { Briefing } from '../lib/types';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(__dirname, '../..');
 
+// Monta o HTML do email a partir de um briefing já curado (sem LLM — o conteúdo
+// na voz final já veio do curate). Útil pra inspecionar o template localmente.
 async function main() {
-  const profilePath = resolve(ROOT, 'fixtures/profile.json');
   const briefingPath = process.argv[2]
     ? resolve(process.cwd(), process.argv[2])
     : resolve(ROOT, 'output/briefings/latest.json');
 
-  if (!existsSync(profilePath)) {
-    console.error(`Perfil não encontrado em: ${profilePath}`);
-    process.exit(1);
-  }
   if (!existsSync(briefingPath)) {
     console.error(`Briefing não encontrado em: ${briefingPath}. Rode "npm run curate" primeiro.`);
     process.exit(1);
   }
 
-  const profile: Profile = JSON.parse(await readFile(profilePath, 'utf8'));
   const briefing: Briefing = JSON.parse(await readFile(briefingPath, 'utf8'));
 
   if (briefing.itens.length === 0) {
-    console.log('[email] briefing vazio — nenhum email a gerar (conforme spec do Prompt 2).');
+    console.log('[email] briefing vazio — nenhum email a gerar.');
     process.exit(0);
   }
 
-  const provider = await getProvider();
-  const { system, user } = buildEmailPrompt(profile, briefing);
-
-  console.log(`[email] provider=${provider.name} model=${provider.model}`);
-  console.log(`[email] ${briefing.itens.length} itens no briefing → gerando email…`);
-  const t0 = Date.now();
-
-  const result = await provider.complete({
-    system,
-    messages: [{ role: 'user', content: user }],
-    webSearch: false,
-    maxTokens: 16384,
-    jsonMode: true,
-  });
-
-  const elapsed = ((Date.now() - t0) / 1000).toFixed(1);
-  console.log(`[email] resposta recebida em ${elapsed}s`);
-  const cost = calculateCost(provider.model, result.usage);
-  console.log(`[email] ${formatCost(result.usage, cost, provider.model)}`);
-
-  const email = extractJson<EmailOutput>(result.text);
-
-  const stamp = timestamp();
-  const dir = resolve(ROOT, 'output/emails', `${stamp}-${provider.name}`);
-  await mkdir(dir, { recursive: true });
-  await writeFile(resolve(dir, 'subject.txt'), email.assunto);
-  await writeFile(resolve(dir, 'email.html'), email.html);
-  await writeFile(
-    resolve(dir, 'meta.json'),
-    JSON.stringify(
-      {
-        provider: provider.name,
-        model: provider.model,
-        timestamp: new Date().toISOString(),
-        elapsed_seconds: Number(elapsed),
-        briefing_path: briefingPath,
-        usage: result.usage,
-        cost,
-      },
-      null,
-      2,
-    ),
-  );
+  const assunto = briefing.assunto?.trim() || 'Seu resumo de hoje';
+  const html = renderEmailHtml(briefing);
 
   const latestDir = resolve(ROOT, 'output/emails/latest');
   await mkdir(latestDir, { recursive: true });
-  await writeFile(resolve(latestDir, 'subject.txt'), email.assunto);
-  await writeFile(resolve(latestDir, 'email.html'), email.html);
+  await writeFile(resolve(latestDir, 'subject.txt'), assunto);
+  await writeFile(resolve(latestDir, 'email.html'), html);
 
-  console.log(`\n[email] Assunto: ${email.assunto}`);
-  console.log(`[email] HTML salvo em: ${dir}/email.html`);
-  console.log(`[email] também copiado para: output/emails/latest/email.html`);
-  console.log(`[email] abra no browser: open ${dir}/email.html`);
-}
-
-function timestamp(): string {
-  const d = new Date();
-  const pad = (n: number) => n.toString().padStart(2, '0');
-  return `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}`;
+  console.log(`[email] Assunto: ${assunto}`);
+  console.log(`[email] ${briefing.itens.length} itens → HTML montado via template (sem LLM)`);
+  console.log(`[email] salvo em: output/emails/latest/email.html`);
+  console.log(`[email] abra no browser: open output/emails/latest/email.html`);
 }
 
 main().catch((err) => {

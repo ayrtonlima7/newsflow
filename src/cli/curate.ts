@@ -2,14 +2,14 @@ import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { getProvider, extractJson } from '../lib/providers/index';
-import { buildCuratePrompt } from '../prompts/curate';
-import { calculateCost, formatCost } from '../lib/pricing';
-import type { Briefing, Profile } from '../lib/types';
+import { generateBriefing } from '../lib/pipeline';
+import { formatCost } from '../lib/pricing';
+import type { Profile } from '../lib/types';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(__dirname, '../..');
 
+// Gera um briefing via pipeline real (Tavily busca + DeepSeek cura). Salva JSON.
 async function main() {
   const profilePath = process.argv[2]
     ? resolve(process.cwd(), process.argv[2])
@@ -22,75 +22,26 @@ async function main() {
   }
 
   const profile: Profile = JSON.parse(await readFile(profilePath, 'utf8'));
-  const provider = await getProvider();
 
-  if (!provider.supportsWebSearch) {
-    console.error(
-      `Provider "${provider.name}" não suporta busca web nativa. ` +
-        'Use LLM_PROVIDER=gemini para a curadoria.',
-    );
-    process.exit(1);
-  }
-
-  const { system, user } = buildCuratePrompt(profile);
-
-  console.log(`[curate] provider=${provider.name} model=${provider.model}`);
   console.log(
-    `[curate] perfil: ${profile.nome || '(sem nome)'} — ${profile.tema.join(', ')} (${profile.contexto || '?'}) — tópicos: ${profile.topicos.join(', ')}`,
+    `[curate] perfil: ${profile.nome || '(sem nome)'} — ${(profile.tema ?? []).join(', ')} (${profile.contexto || '?'})`,
   );
-  console.log(`[curate] chamando o modelo com web search habilitado…`);
-  const t0 = Date.now();
+  console.log(`[curate] tópicos: ${(profile.topicos ?? []).join(', ')}`);
 
-  const result = await provider.complete({
-    system,
-    messages: [{ role: 'user', content: user }],
-    webSearch: true,
-    maxTokens: 8192,
-  });
+  const { briefing, meta } = await generateBriefing(profile);
 
-  const elapsed = ((Date.now() - t0) / 1000).toFixed(1);
-  console.log(`[curate] resposta recebida em ${elapsed}s, ${result.citations.length} citações`);
-  const cost = calculateCost(provider.model, result.usage);
-  console.log(`[curate] ${formatCost(result.usage, cost, provider.model)}`);
-
-  let briefing: Briefing;
-  try {
-    briefing = extractJson<Briefing>(result.text);
-  } catch (err) {
-    const rawPath = resolve(ROOT, 'output/briefings', `${timestamp()}-raw.txt`);
-    await mkdir(dirname(rawPath), { recursive: true });
-    await writeFile(rawPath, result.text);
-    console.error(`[curate] falha ao parsear JSON. Resposta crua salva em: ${rawPath}`);
-    throw err;
-  }
+  console.log(`[curate] ${formatCost(meta.usage, meta.cost, meta.model)}`);
 
   const stamp = timestamp();
-  const outPath = resolve(ROOT, 'output/briefings', `${stamp}-${provider.name}.json`);
+  const outPath = resolve(ROOT, 'output/briefings', `${stamp}.json`);
   await mkdir(dirname(outPath), { recursive: true });
-  await writeFile(
-    outPath,
-    JSON.stringify(
-      {
-        meta: {
-          provider: provider.name,
-          model: provider.model,
-          timestamp: new Date().toISOString(),
-          elapsed_seconds: Number(elapsed),
-          citations: result.citations,
-          usage: result.usage,
-          cost,
-        },
-        briefing,
-      },
-      null,
-      2,
-    ),
-  );
+  await writeFile(outPath, JSON.stringify({ meta, briefing }, null, 2));
 
   const latestPath = resolve(ROOT, 'output/briefings/latest.json');
   await writeFile(latestPath, JSON.stringify(briefing, null, 2));
 
-  console.log(`\n[curate] ${briefing.itens.length} itens selecionados:`);
+  console.log(`\n[curate] assunto: ${briefing.assunto ?? '(sem assunto)'}`);
+  console.log(`[curate] ${briefing.itens.length} itens selecionados:`);
   for (const item of briefing.itens) {
     console.log(`  • [${item.relevancia}] ${item.titulo} (${item.fonte})`);
   }

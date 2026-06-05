@@ -1,9 +1,9 @@
 import { getProvider, extractJson } from './providers';
 import { buildCurateFromResultsPrompt, buildSearchQueries } from '../prompts/curate';
-import { buildEmailPrompt } from '../prompts/email';
 import { calculateCost } from './pricing';
 import { validateSelectedLeniently, type DroppedItem } from './url-validation';
 import { tavilySearchMany } from './search';
+import { renderEmailHtml } from './email-template';
 import type { Profile, Briefing, BriefingItem, EmailOutput } from './types';
 import { frequenciaParaJanela } from './types';
 
@@ -197,40 +197,25 @@ function filterByFreshness(
   return { freshItems, staleDropped };
 }
 
+/**
+ * Monta o email a partir do briefing. NÃO chama LLM — o conteúdo (assunto, intro,
+ * corpos na voz final) já veio do generateBriefing. Aqui só renderizamos o
+ * template HTML em código (instantâneo, consistente).
+ */
 export async function generateEmail(
-  profile: Profile,
+  _profile: Profile,
   briefing: Briefing,
 ): Promise<{ email: EmailOutput; meta: PipelineMeta }> {
-  // Provider do email (default = LLM_PROVIDER).
-  const provider = await getProvider(
-    process.env.EMAIL_LLM_PROVIDER ?? process.env.LLM_PROVIDER,
-  );
-  const { system, user } = buildEmailPrompt(profile, briefing);
-  const t0 = Date.now();
-  const result = await provider.complete({
-    system,
-    messages: [{ role: 'user', content: user }],
-    webSearch: false,
-    maxTokens: 8192,
-    jsonMode: true,
-  });
-  const elapsedSeconds = (Date.now() - t0) / 1000;
-  console.log(
-    `[timing] DeepSeek email gen (${provider.model}): ${elapsedSeconds.toFixed(1)}s | out=${result.usage.outputTokens}tok`,
-  );
-  if (!result.text.trim()) {
-    throw new Error('email: resposta vazia do modelo');
-  }
-  const email = extractJson<EmailOutput>(result.text);
-  const cost = calculateCost(provider.model, result.usage);
+  const html = renderEmailHtml(briefing);
+  const assunto = briefing.assunto?.trim() || 'Seu resumo de hoje';
   return {
-    email,
+    email: { assunto, html },
     meta: {
-      provider: provider.name,
-      model: provider.model,
-      elapsedSeconds,
-      usage: result.usage,
-      cost,
+      provider: 'template',
+      model: '-',
+      elapsedSeconds: 0,
+      usage: emptyUsage(),
+      cost: calculateCost('', emptyUsage()),
     },
   };
 }

@@ -22,16 +22,43 @@ function parseHorario(horario: string): number | null {
   return h >= 0 && h <= 23 ? h : null;
 }
 
-/** Intervalo mínimo entre entregas, baseado na frequência. Casa com o que
- *  frequenciaParaJanela retorna em janelaDias. */
-function minIntervalMs(frequencia: string): number {
+/** Data-calendário SP (YYYY-MM-DD) de um instante. SP = UTC-3. */
+function spDateString(d: Date): string {
+  const sp = new Date(d.getTime() + SP_OFFSET_HOURS * 3600_000);
+  return sp.toISOString().split('T')[0];
+}
+
+/**
+ * Já entregou nesta "janela" da frequência? Idempotência por período, não por
+ * "X horas desde o último envio" — assim um teste manual ontem NÃO bloqueia o
+ * agendado de hoje.
+ *
+ * - Diária: bloqueia se já entregou no MESMO dia-calendário SP.
+ * - 3 dias / semanal: janela deslizante com folga (2.5d / 6d) pra absorver drift,
+ *   mas sem barrar o ciclo seguinte (ex: semanal toda sexta 06:00 = exatamente 7d).
+ */
+function alreadyDeliveredThisPeriod(
+  frequencia: string,
+  lastDeliveredAt: string,
+  now: Date,
+): boolean {
   const f = frequencia.toLowerCase();
-  if (f.includes('semana')) return 6 * 24 * 3600_000; // 6 dias (folga pra 7)
-  if (f.includes('3 dias') || f.includes('três dias') || f.includes('tres dias')) {
-    return 2.5 * 24 * 3600_000; // 2.5 dias (folga pra 3)
+  const last = new Date(lastDeliveredAt);
+
+  // Diária → comparação de dia-calendário
+  if (
+    !f.includes('semana') &&
+    !f.includes('3 dias') &&
+    !f.includes('três dias') &&
+    !f.includes('tres dias')
+  ) {
+    return spDateString(last) === spDateString(now);
   }
-  // Default: diária — 23h dá folga pra rodar 1x/dia
-  return 23 * 3600_000;
+
+  // 3 dias / semanal → janela deslizante com folga
+  const diffDays = (now.getTime() - last.getTime()) / (24 * 3600_000);
+  if (f.includes('semana')) return diffDays < 6;
+  return diffDays < 2.5; // 3 dias
 }
 
 type ProfileRow = Profile & {
@@ -69,17 +96,16 @@ function isDue(
     };
   }
 
-  // Idempotência: respeitar frequência (não mandar 2 emails na mesma janela
-  // — protege contra GitHub Actions firing 2x ou cron atrasado).
-  if (profile.last_delivered_at) {
-    const last = new Date(profile.last_delivered_at).getTime();
-    const diff = now.getTime() - last;
-    const min = minIntervalMs(profile.frequencia);
-    if (diff < min) {
-      const hoursAgo = (diff / 3600_000).toFixed(1);
-      const minHours = (min / 3600_000).toFixed(0);
-      return { due: false, reason: `última entrega há ${hoursAgo}h (min ${minHours}h)` };
-    }
+  // Idempotência por período (não por "X horas") — teste manual ontem não
+  // bloqueia o agendado de hoje. Protege contra cron disparar 2x na mesma janela.
+  if (
+    profile.last_delivered_at &&
+    alreadyDeliveredThisPeriod(profile.frequencia, profile.last_delivered_at, now)
+  ) {
+    return {
+      due: false,
+      reason: `já entregue nesta janela (última: ${profile.last_delivered_at})`,
+    };
   }
 
   return { due: true };

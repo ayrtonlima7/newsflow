@@ -14,11 +14,22 @@ import { normalizeLocale, type Locale } from './i18n';
  *  ficam globais por ora (sem lista). */
 const DOMAINS_BY_LOCALE: Partial<Record<Locale, string[]>> = {
   pt: [
-    'g1.globo.com', 'ge.globo.com', 'oglobo.globo.com', 'valor.globo.com',
-    'uol.com.br', 'folha.uol.com.br', 'estadao.com.br', 'cnnbrasil.com.br',
-    'lance.com.br', 'exame.com', 'infomoney.com.br', 'tecmundo.com.br',
-    'canaltech.com.br', 'olhardigital.com.br', 'veja.abril.com.br',
-    'terra.com.br', 'metropoles.com', 'espn.com.br',
+    // Notícia geral
+    'g1.globo.com', 'oglobo.globo.com', 'uol.com.br', 'folha.uol.com.br',
+    'estadao.com.br', 'cnnbrasil.com.br', 'terra.com.br', 'metropoles.com',
+    'r7.com', 'band.uol.com.br', 'cartacapital.com.br', 'gazetadopovo.com.br',
+    'poder360.com.br', 'agenciabrasil.ebc.com.br', 'brasil.elpais.com',
+    // Esporte
+    'ge.globo.com', 'lance.com.br', 'espn.com.br', 'trivela.com.br',
+    // Economia / negócios
+    'valor.globo.com', 'exame.com', 'infomoney.com.br', 'braziljournal.com',
+    'neofeed.com.br', 'moneytimes.com.br',
+    // Tecnologia
+    'tecmundo.com.br', 'canaltech.com.br', 'olhardigital.com.br',
+    'tecnoblog.net', 'meiobit.com', 'mobiletime.com.br',
+    // Ciência / saúde / cultura
+    'veja.abril.com.br', 'super.abril.com.br', 'saude.abril.com.br',
+    'revistagalileu.globo.com', 'omelete.com.br',
   ],
 };
 

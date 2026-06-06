@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
   if (code) {
     const { error } = await supabase.auth.exchangeCodeForSession(code);
     if (error) {
-      redirect(`/login?error=${encodeURIComponent(error.message)}` as never);
+      redirect(`/?error=${encodeURIComponent(error.message)}` as never);
     }
     redirect(next as never);
   }
@@ -25,10 +25,10 @@ export async function GET(request: NextRequest) {
   if (token_hash && type) {
     const { error } = await supabase.auth.verifyOtp({ type, token_hash });
     if (error) {
-      redirect(`/login?error=${encodeURIComponent(error.message)}` as never);
+      redirect(`/?error=${encodeURIComponent(error.message)}` as never);
     }
     redirect(next as never);
   }
 
-  redirect('/login?error=missing-token');
+  redirect('/?error=missing-token');
 }

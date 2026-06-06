@@ -26,6 +26,7 @@ const pt: Dictionary = {
     'Curadoria diária por IA das notícias que importam pra você — sem o ruído de redes sociais, sem manchetes infladas. Direto no seu email, no horário que você escolher.',
   'landing.ctaCreate': 'Criar meu perfil de curadoria',
   'landing.ctaLogin': 'Já tenho conta',
+  'landing.authNote': 'Entre ou crie sua conta — novos usuários montam o perfil em seguida.',
 
   // login
   'login.back': '← voltar',
@@ -166,6 +167,7 @@ const en: Dictionary = {
     'Daily AI curation of the news that matters to you — without the social-media noise or inflated headlines. Straight to your inbox, at the time you choose.',
   'landing.ctaCreate': 'Create my curation profile',
   'landing.ctaLogin': 'I already have an account',
+  'landing.authNote': 'Sign in or create your account — new users set up their profile next.',
 
   'login.back': '← back',
   'login.title': 'Sign in to NewsFlow',
@@ -299,6 +301,7 @@ const es: Dictionary = {
     'Curaduría diaria por IA de las noticias que te importan — sin el ruido de las redes ni titulares inflados. Directo a tu correo, a la hora que elijas.',
   'landing.ctaCreate': 'Crear mi perfil de curaduría',
   'landing.ctaLogin': 'Ya tengo cuenta',
+  'landing.authNote': 'Entra o crea tu cuenta — los nuevos usuarios configuran el perfil a seguir.',
 
   'login.back': '← volver',
   'login.title': 'Entrar en NewsFlow',

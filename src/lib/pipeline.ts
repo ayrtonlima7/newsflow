@@ -6,7 +6,21 @@ import { tavilySearchMany } from './search';
 import { renderEmailHtml } from './email-template';
 import type { Profile, Briefing, BriefingItem, EmailOutput } from './types';
 import { frequenciaParaJanela } from './types';
-import { normalizeLocale } from './i18n';
+import { normalizeLocale, type Locale } from './i18n';
+
+/** Domínios de qualidade por idioma. O índice `news` da Tavily é global/inglês
+ *  por padrão — pra usuários pt isso devolve esporte/notícia dos EUA em vez de
+ *  conteúdo BR. Restringir a fontes locais (include_domains) resolve. en/es
+ *  ficam globais por ora (sem lista). */
+const DOMAINS_BY_LOCALE: Partial<Record<Locale, string[]>> = {
+  pt: [
+    'g1.globo.com', 'ge.globo.com', 'oglobo.globo.com', 'valor.globo.com',
+    'uol.com.br', 'folha.uol.com.br', 'estadao.com.br', 'cnnbrasil.com.br',
+    'lance.com.br', 'exame.com', 'infomoney.com.br', 'tecmundo.com.br',
+    'canaltech.com.br', 'olhardigital.com.br', 'veja.abril.com.br',
+    'terra.com.br', 'metropoles.com', 'espn.com.br',
+  ],
+};
 
 export interface PipelineUsage {
   inputTokens: number;
@@ -52,6 +66,7 @@ export async function generateBriefing(
     days: janela.janelaDias,
     maxResults: 8,
     topic: 'news',
+    includeDomains: DOMAINS_BY_LOCALE[locale],
   });
   console.log(
     `[timing] Tavily (${queries.length} queries): ${((Date.now() - tTavily) / 1000).toFixed(1)}s → ${rawResults.length} resultados | total ${since()}`,

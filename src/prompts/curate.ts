@@ -75,6 +75,7 @@ INSTRUÇÕES:
 - ⚠️ IDIOMA DE SAÍDA: escreva TODO o conteúdo visível (assunto, intro, titulo, corpo) em ${LANGUAGE_NAME[locale]}. Os resultados de busca podem estar em qualquer idioma — traduza/reescreva o que for usar para ${LANGUAGE_NAME[locale]}. NÃO misture idiomas.
 - SELECIONE entre ${janela.itemsMin} e ${janela.itemsMax} resultados — os mais relevantes pro perfil e mais frescos.
 - Use "objetivo" e "contexto" pra calibrar recorte e profundidade. Priorize "topicos" e "referencias". IGNORE o que cai em "ignorar".
+- ⚠️ RELEVÂNCIA É OBRIGATÓRIA: só inclua itens REALMENTE sobre os "tema"/"topicos" do usuário. NUNCA inclua uma notícia que você mesmo descreveria como "não tem relação" / "fora do escopo" (ex: outro esporte, outra liga, política ou país aleatórios) só pra preencher a contagem. É MUITO MELHOR retornar MENOS itens — ou nenhum ("itens": []) — do que encher com conteúdo irrelevante. Não comente itens que você descartou; simplesmente não os inclua.
 - "assunto": específico, mencione os temas do dia. Nunca genérico. Ex (no idioma de saída): "${SUBJECT_EXAMPLE[locale]}".
 - "intro": 1-2 frases de abertura.${p.nome ? ` Comece com "${GREETING[locale]} ${p.nome}," ou variação natural.` : ''} Diga o que está rolando no mundo relevante pra essa pessoa hoje.
 - Para cada item:

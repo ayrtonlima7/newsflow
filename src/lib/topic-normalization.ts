@@ -49,7 +49,12 @@ REGRAS:
 - Mantenha tópicos específicos e factuais — NÃO generalize demais.
 - Preserve o idioma original (PT-BR fica PT-BR).
 - Cada tópico deve virar uma frase nominal de 2 a 12 palavras, sem perguntas, sem imperativos.
-- Se o tópico já está bom, devolva ele igual.
+- TRANSFORME nome de FONTE/CONTA em ASSUNTO buscável. A saída é uma query de
+  NOTÍCIA, não o nome de uma conta/canal/perfil. Remova framing de rede social
+  e de fonte: "(Twitter/Instagram)", "(Instagram)", "conta @x", "perfil de",
+  "Central do", "Podcast X", "Canal Y", "Site Z". Extraia a ENTIDADE + o ASSUNTO
+  que essa fonte cobre.
+- Se o tópico já está bom como query de notícia, devolva ele igual.
 - NÃO invente conceitos novos, NÃO adicione tópicos, NÃO remova tópicos.
 - Considere o contexto do usuário (Profissão/Estudo/Hobby/Curiosidade) pra decidir o registro: "Hobby" tolera termos coloquiais; "Profissão" prefere terminologia técnica.
 
@@ -60,6 +65,10 @@ EXEMPLOS:
 - "renderização em tempo real e experiências imersivas para clientes" → "Renderização em tempo real e experiências imersivas para clientes"
 - "drone fotogrametria" → "Drones e fotogrametria para levantamento de terreno"
 - "futuro do trabalho" → "Futuro do trabalho e transformação profissional"
+- "Central do Botafogo (Twitter/Instagram)" → "Botafogo notícias e bastidores"
+- "Podcast GE Botafogo" → "Botafogo análise e Brasileirão"
+- "Mercado da Bola Botafogo (Instagram)" → "Botafogo mercado da bola e contratações"
+- "Estatísticas Sofascore Brasileirão" → "Brasileirão estatísticas e desempenho dos times"
 
 TÓPICOS DO USUÁRIO (mantenha a ordem e a quantidade exatas):
 ${JSON.stringify(cleanInput, null, 2)}

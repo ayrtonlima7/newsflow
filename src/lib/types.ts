@@ -38,6 +38,10 @@ export interface Profile {
   /** Email pra onde a curadoria é enviada. Se vazio/ausente, usa o email da conta
    *  (auth). NÃO vai pro prompt da IA — é só destino de entrega. */
   delivery_email?: string;
+
+  /** Idioma do usuário: 'pt' | 'en' | 'es' (default 'pt'). Define a língua da
+   *  curadoria e do email. Normalizado via normalizeLocale() no uso. */
+  idioma?: string;
 }
 
 export type Relevancia = 'Alta' | 'Média';

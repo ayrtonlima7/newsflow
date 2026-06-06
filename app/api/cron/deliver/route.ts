@@ -191,6 +191,7 @@ export async function GET(req: NextRequest) {
           frequencia: profile.frequencia ?? '',
           horario: profile.horario ?? '8h',
           delivery_email: profile.delivery_email ?? undefined,
+          idioma: profile.idioma ?? 'pt',
         },
       },
       // force=1 também pula o gate de assinatura (pra admin testar)

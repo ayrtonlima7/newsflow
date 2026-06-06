@@ -6,6 +6,7 @@ import { SettingsForm } from './settings-form';
 import { SampleCard } from './sample-card';
 import { SubscriptionCard } from './subscription-card';
 import { DeliveryEmailCard } from './delivery-email-card';
+import { LanguageCard } from './language-card';
 import { canDeliver, type SubscriptionStatus } from '@/src/lib/subscription';
 import type { ProfileUpdateInput } from './actions';
 
@@ -102,6 +103,8 @@ export default async function SettingsPage({
         trialEnd={profile.trial_end ?? null}
         justSubscribed={sub === 'success'}
       />
+
+      <LanguageCard idioma={profile.idioma ?? null} />
 
       <DeliveryEmailCard
         authEmail={user.email ?? ''}

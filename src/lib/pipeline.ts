@@ -6,6 +6,7 @@ import { tavilySearchMany } from './search';
 import { renderEmailHtml } from './email-template';
 import type { Profile, Briefing, BriefingItem, EmailOutput } from './types';
 import { frequenciaParaJanela } from './types';
+import { normalizeLocale } from './i18n';
 
 export interface PipelineUsage {
   inputTokens: number;
@@ -37,6 +38,7 @@ export async function generateBriefing(
   profile: Profile,
 ): Promise<{ briefing: Briefing; meta: PipelineMeta }> {
   const janela = frequenciaParaJanela(profile.frequencia);
+  const locale = normalizeLocale(profile.idioma);
   const t0 = Date.now();
   const since = () => `${((Date.now() - t0) / 1000).toFixed(1)}s`;
 
@@ -76,7 +78,7 @@ export async function generateBriefing(
   const provider = await getProvider(
     process.env.CURATE_LLM_PROVIDER ?? process.env.LLM_PROVIDER,
   );
-  const { system, user } = buildCurateFromResultsPrompt(profile, rawResults);
+  const { system, user } = buildCurateFromResultsPrompt(profile, rawResults, locale);
   const tCurate = Date.now();
   const result = await provider.complete({
     system,
@@ -203,11 +205,13 @@ function filterByFreshness(
  * template HTML em código (instantâneo, consistente).
  */
 export async function generateEmail(
-  _profile: Profile,
+  profile: Profile,
   briefing: Briefing,
 ): Promise<{ email: EmailOutput; meta: PipelineMeta }> {
-  const html = renderEmailHtml(briefing);
-  const assunto = briefing.assunto?.trim() || 'Seu resumo de hoje';
+  const locale = normalizeLocale(profile.idioma);
+  const html = renderEmailHtml(briefing, locale);
+  const assuntoFallback = { pt: 'Seu resumo de hoje', en: 'Your briefing today', es: 'Tu resumen de hoy' }[locale];
+  const assunto = briefing.assunto?.trim() || assuntoFallback;
   return {
     email: { assunto, html },
     meta: {

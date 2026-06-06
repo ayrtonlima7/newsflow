@@ -1,6 +1,39 @@
 import type { Profile } from '../lib/types';
 import { frequenciaParaJanela, profileForPrompt } from '../lib/types';
 import type { SearchResult } from '../lib/search';
+import { LANGUAGE_NAME, type Locale } from '../lib/i18n';
+
+/** Persona "amigo investido" escrita NATIVAMENTE em cada idioma (a voz é a alma
+ *  do produto — tradução literal soa morta). */
+const SYSTEM_BY_LOCALE: Record<Locale, string> = {
+  pt: `Você escreve para o leitor como um amigo mais experiente, atento e investido no crescimento profissional e pessoal dele. Você leu tudo, separou o que importa, e está repassando — com os detalhes cruciais já mastigados.
+
+Nunca soa institucional, nunca soa "newsletter de marca", nunca tenta vender. Soa como uma pessoa real escrevendo para outra. Calibre o registro pelo contexto do usuário (Profissão = técnico e direto; Estudo = didático sem ser básico; Hobby = caloroso; Curiosidade = acessível) e pelo objetivo dele.
+
+Você recebe RESULTADOS DE BUSCA REAIS (título, URL, trecho) e seleciona os melhores. REGRA ABSOLUTA: só pode usar URLs que estão EXATAMENTE na lista. NUNCA invente, modifique ou complete uma URL — copie verbatim.`,
+
+  en: `You write to the reader like a more experienced friend who is genuinely invested in their professional and personal growth. You've read everything, sifted out what matters, and you're passing it along — with the crucial details already chewed over for them.
+
+You never sound institutional, never like a "brand newsletter," never like you're selling. You sound like a real person writing to another. Calibrate your register to the reader's context (Profession = technical and direct; Study = didactic without being basic; Hobby = warm; Curiosity = accessible) and to their goal.
+
+You receive REAL SEARCH RESULTS (title, URL, snippet) and pick the best ones. ABSOLUTE RULE: you may only use URLs that appear EXACTLY in the list. NEVER invent, modify, or complete a URL — copy it verbatim.`,
+
+  es: `Le escribes al lector como un amigo más experimentado, atento y genuinamente comprometido con su crecimiento profesional y personal. Lo leíste todo, separaste lo que importa y se lo pasas — con los detalles cruciales ya masticados.
+
+Nunca suenas institucional, nunca como "newsletter de marca", nunca intentas vender. Suenas como una persona real escribiéndole a otra. Calibra el registro según el contexto del usuario (Profesión = técnico y directo; Estudio = didáctico sin ser básico; Hobby = cálido; Curiosidad = accesible) y según su objetivo.
+
+Recibes RESULTADOS DE BÚSQUEDA REALES (título, URL, fragmento) y eliges los mejores. REGLA ABSOLUTA: solo puedes usar URLs que estén EXACTAMENTE en la lista. NUNCA inventes, modifiques ni completes una URL — cópiala literalmente.`,
+};
+
+/** Saudação de abertura por idioma. */
+const GREETING: Record<Locale, string> = { pt: 'Oi', en: 'Hi', es: 'Hola' };
+
+/** Exemplo de assunto por idioma (ilustra o tom esperado). */
+const SUBJECT_EXAMPLE: Record<Locale, string> = {
+  pt: 'VR pra vender projetos, drones em obras e 1 tendência que vale sua atenção',
+  en: 'VR for pitching projects, drones on the job site, and 1 trend worth your attention',
+  es: 'VR para vender proyectos, drones en obra y 1 tendencia que merece tu atención',
+};
 
 /**
  * UMA chamada que faz tudo: seleciona os resultados reais da Tavily, escreve o
@@ -13,15 +46,12 @@ import type { SearchResult } from '../lib/search';
 export function buildCurateFromResultsPrompt(
   profile: Profile,
   results: SearchResult[],
+  locale: Locale = 'pt',
 ): { system: string; user: string } {
   const janela = frequenciaParaJanela(profile.frequencia);
   const p = profileForPrompt(profile);
 
-  const system = `Você escreve para o leitor como um amigo mais experiente, atento e investido no crescimento profissional e pessoal dele. Você leu tudo, separou o que importa, e está repassando — com os detalhes cruciais já mastigados.
-
-Nunca soa institucional, nunca soa "newsletter de marca", nunca tenta vender. Soa como uma pessoa real escrevendo para outra. Calibre o registro pelo contexto do usuário (Profissão = técnico e direto; Estudo = didático sem ser básico; Hobby = caloroso; Curiosidade = acessível) e pelo objetivo dele.
-
-Você recebe RESULTADOS DE BUSCA REAIS (título, URL, trecho) e seleciona os melhores. REGRA ABSOLUTA: só pode usar URLs que estão EXATAMENTE na lista. NUNCA invente, modifique ou complete uma URL — copie verbatim.`;
+  const system = SYSTEM_BY_LOCALE[locale];
 
   const resultsList = results
     .map((r, i) => {
@@ -42,10 +72,11 @@ RESULTADOS DE BUSCA DISPONÍVEIS (${results.length} itens):
 ${resultsList}
 
 INSTRUÇÕES:
+- ⚠️ IDIOMA DE SAÍDA: escreva TODO o conteúdo visível (assunto, intro, titulo, corpo) em ${LANGUAGE_NAME[locale]}. Os resultados de busca podem estar em qualquer idioma — traduza/reescreva o que for usar para ${LANGUAGE_NAME[locale]}. NÃO misture idiomas.
 - SELECIONE entre ${janela.itemsMin} e ${janela.itemsMax} resultados — os mais relevantes pro perfil e mais frescos.
 - Use "objetivo" e "contexto" pra calibrar recorte e profundidade. Priorize "topicos" e "referencias". IGNORE o que cai em "ignorar".
-- "assunto": específico, mencione os temas do dia. Nunca genérico ("Suas notícias de hoje"). Ex: "VR pra vender projetos, drones em obras e 1 tendência que vale sua atenção".
-- "intro": 1-2 frases de abertura.${p.nome ? ` Comece com "Oi ${p.nome}," ou variação natural.` : ''} Diga o que está rolando no mundo relevante pra essa pessoa hoje.
+- "assunto": específico, mencione os temas do dia. Nunca genérico. Ex (no idioma de saída): "${SUBJECT_EXAMPLE[locale]}".
+- "intro": 1-2 frases de abertura.${p.nome ? ` Comece com "${GREETING[locale]} ${p.nome}," ou variação natural.` : ''} Diga o que está rolando no mundo relevante pra essa pessoa hoje.
 - Para cada item:
   * titulo: claro e fiel ao conteúdo.
   * fonte: nome do veículo (extraia do domínio).

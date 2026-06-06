@@ -75,6 +75,7 @@ async function main() {
     frequencia: profileRow.frequencia ?? '',
     horario: profileRow.horario ?? '8h',
     delivery_email: profileRow.delivery_email ?? undefined,
+    idioma: profileRow.idioma ?? 'pt',
   };
 
   console.log(`[deliver] user=${userEmail} dry=${dryRun}`);

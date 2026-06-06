@@ -102,7 +102,7 @@ The onboarding was redesigned from "professional-centric" (area/cargo/tom) to "i
 
 ### Auth & RLS
 
-Supabase Auth via `@supabase/ssr`. `middleware.ts` runs `getUser()` on every request to refresh tokens and gates `/onboarding`, `/settings`, `/dashboard`. RLS is enabled on `profiles`, `briefings`, `deliveries` — owners can read their own rows; writes from the pipeline use the **admin (service-role) client** which bypasses RLS. Never use the admin client in code that reaches the browser. `/api/admin/stats` is gated by matching `user.email === ADMIN_EMAIL`.
+Supabase Auth via `@supabase/ssr`. **Login is unified on the home page (`/`)** — the landing pitch + the `LoginForm` (Google OAuth + email magic-link) render together; `/login` is now just a redirect to `/` (preserves `next`/`error`). An authenticated user hitting `/` is redirected to `/settings`. `middleware.ts` runs `getUser()` on every request to refresh tokens and gates `/onboarding`, `/settings`, `/dashboard` — unauthenticated hits redirect to `/?next=<path>`. RLS is enabled on `profiles`, `briefings`, `deliveries` — owners can read their own rows; writes from the pipeline use the **admin (service-role) client** which bypasses RLS. Never use the admin client in code that reaches the browser. `/api/admin/stats` is gated by matching `user.email === ADMIN_EMAIL`.
 
 ### Feedback & unsubscribe
 

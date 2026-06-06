@@ -35,8 +35,9 @@ export async function middleware(request: NextRequest) {
   const isProtected = PROTECTED_PREFIXES.some((prefix) => path.startsWith(prefix));
 
   if (isProtected && !user) {
+    // Login foi unificado na home (/). Manda pra lá com next pra voltar depois.
     const url = request.nextUrl.clone();
-    url.pathname = '/login';
+    url.pathname = '/';
     url.searchParams.set('next', path);
     return NextResponse.redirect(url);
   }

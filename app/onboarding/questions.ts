@@ -62,9 +62,9 @@ const TXT: Record<string, { q: Tri; helper?: Tri; placeholder?: Tri; chips?: Tri
       es: 'Lo usaré en tus emails. Nombre, apodo, lo que prefieras.',
     },
     placeholder: {
-      pt: 'Ex: Ayrton, Lu, Dr. Carlos...',
-      en: 'E.g. Ayrton, Lu, Dr. Carlos...',
-      es: 'Ej: Ayrton, Lu, Dr. Carlos...',
+      pt: 'Seu nome ou apelido',
+      en: 'Your name or nickname',
+      es: 'Tu nombre o apodo',
     },
   },
   tema: {

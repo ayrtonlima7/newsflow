@@ -190,6 +190,7 @@ export async function GET(req: NextRequest) {
           ignorar: profile.ignorar ?? [],
           frequencia: profile.frequencia ?? '',
           horario: profile.horario ?? '8h',
+          delivery_email: profile.delivery_email ?? undefined,
         },
       },
       // force=1 também pula o gate de assinatura (pra admin testar)

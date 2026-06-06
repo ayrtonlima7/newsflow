@@ -5,6 +5,7 @@ import { signOut } from '@/app/login/actions';
 import { SettingsForm } from './settings-form';
 import { SampleCard } from './sample-card';
 import { SubscriptionCard } from './subscription-card';
+import { DeliveryEmailCard } from './delivery-email-card';
 import { canDeliver, type SubscriptionStatus } from '@/src/lib/subscription';
 import type { ProfileUpdateInput } from './actions';
 
@@ -102,10 +103,18 @@ export default async function SettingsPage({
         justSubscribed={sub === 'success'}
       />
 
+      <DeliveryEmailCard
+        authEmail={user.email ?? ''}
+        deliveryEmail={profile.delivery_email ?? null}
+      />
+
       {/* Amostra só pra quem está liberado (assinante/trial). Free vê o card de
           assinatura acima — o "test drive" do produto é o trial de 30 dias. */}
       {gate.allowed && (
-        <SampleCard userEmail={user.email ?? ''} lastDeliveredAt={profile.last_delivered_at} />
+        <SampleCard
+          userEmail={profile.delivery_email || user.email || ''}
+          lastDeliveredAt={profile.last_delivered_at}
+        />
       )}
 
       <SettingsForm initial={initial} isActive={profile.is_active} />

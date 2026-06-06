@@ -34,6 +34,10 @@ export interface Profile {
 
   /** Horário fixo em 8h hoje (Vercel Hobby roda cron 1×/dia). Reativável no Pro. */
   horario: string;
+
+  /** Email pra onde a curadoria é enviada. Se vazio/ausente, usa o email da conta
+   *  (auth). NÃO vai pro prompt da IA — é só destino de entrega. */
+  delivery_email?: string;
 }
 
 export type Relevancia = 'Alta' | 'Média';

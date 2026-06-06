@@ -74,6 +74,7 @@ async function main() {
     ignorar: profileRow.ignorar ?? [],
     frequencia: profileRow.frequencia ?? '',
     horario: profileRow.horario ?? '8h',
+    delivery_email: profileRow.delivery_email ?? undefined,
   };
 
   console.log(`[deliver] user=${userEmail} dry=${dryRun}`);

@@ -157,7 +157,11 @@ export async function runDeliveryPipeline(
     if (!resendKey) throw new Error('RESEND_API_KEY ausente');
     if (!from) throw new Error('RESEND_FROM ausente');
 
-    const to = opts.overrideTo ?? process.env.RESEND_OVERRIDE_TO ?? input.email;
+    // Destino: override explícito > override de env > email de entrega do perfil
+    // > email da conta (auth). delivery_email permite receber em outro endereço.
+    const deliveryEmail = input.profile.delivery_email?.trim() || undefined;
+    const to =
+      opts.overrideTo ?? process.env.RESEND_OVERRIDE_TO ?? deliveryEmail ?? input.email;
     const unsubscribeUrl = `${base}/api/unsubscribe?id=${deliveryId}`;
     const resend = new Resend(resendKey);
     const { data: sendData, error: sendErr } = await resend.emails.send({

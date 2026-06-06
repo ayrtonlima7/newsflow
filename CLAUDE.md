@@ -9,7 +9,9 @@ npm run dev          # Next.js dev server
 npm run build        # Next production build
 npm run start        # Next production server
 npm run lint         # next lint
-npm run typecheck    # tsc --noEmit (no test runner in this repo)
+npm run typecheck    # tsc --noEmit
+npm test             # vitest run (testes de lógica pura em src/lib; *.test.ts colocados)
+npm run test:watch   # vitest em watch (dev)
 ```
 
 CLI pipeline scripts (all via `tsx`, load `.env.local` then `.env`):

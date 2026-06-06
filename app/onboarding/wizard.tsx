@@ -19,6 +19,7 @@ type Answers = {
   formatos: string[];
   ignorar: string[];
   frequencia: string;
+  horario: string;
 };
 
 const empty: Answers = {
@@ -32,6 +33,7 @@ const empty: Answers = {
   formatos: [],
   ignorar: [],
   frequencia: '',
+  horario: '',
 };
 
 export function OnboardingWizard({ userEmail }: { userEmail: string }) {
@@ -162,7 +164,7 @@ export function OnboardingWizard({ userEmail }: { userEmail: string }) {
       formatos: answers.formatos,
       ignorar: answers.ignorar,
       frequencia: answers.frequencia,
-      horario: '8h',
+      horario: answers.horario || '8h',
     };
     return <ConfirmCard profile={profile} onEdit={jumpToStart} />;
   }

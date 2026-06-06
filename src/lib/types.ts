@@ -36,7 +36,8 @@ export interface Profile {
   /** Cadência de envio (Uma vez por semana / Todo dia de manhã). */
   frequencia: string;
 
-  /** Horário fixo em 8h hoje (Vercel Hobby roda cron 1×/dia). Reativável no Pro. */
+  /** Horário escolhido pelo usuário (hora cheia, ex: "21:00"). Respeitado no
+   *  onboarding e usado pelo cron (isDue, tolerância ±1h). Fallback "8h". */
   horario: string;
 
   /** Email pra onde a curadoria é enviada. Se vazio/ausente, usa o email da conta

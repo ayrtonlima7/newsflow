@@ -15,12 +15,12 @@ export default async function LoginPage({
         </a>
         <h1 className="text-3xl font-semibold tracking-tight">Entrar no NewsFlow</h1>
         <p className="text-[var(--color-muted)]">
-          A gente te manda um link mágico. Sem senha, sem complicação.
+          Entre com sua conta Google ou por email. Sem senha, sem complicação.
         </p>
       </div>
       {error && (
         <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-          <p className="font-medium">Não foi possível confirmar o link.</p>
+          <p className="font-medium">Não foi possível entrar.</p>
           <p className="text-red-600/80">{error}</p>
         </div>
       )}

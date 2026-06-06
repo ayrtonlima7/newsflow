@@ -135,6 +135,35 @@ export async function requestMagicLink(
   return { status: 'sent', email };
 }
 
+/**
+ * Login social com Google (OAuth/PKCE). Roda no server client pra o code_verifier
+ * ser gravado em cookie e lido depois no /auth/confirm (exchangeCodeForSession).
+ * O Google manda o usuário de volta pro /auth/confirm?code=...&next=...
+ */
+export async function signInWithGoogle(formData: FormData): Promise<void> {
+  const next = String(formData.get('next') ?? '/onboarding');
+
+  const headerStore = await headers();
+  const origin =
+    headerStore.get('origin') ??
+    `http://${headerStore.get('host') ?? 'localhost:3000'}`;
+  const redirectTo = `${origin}/auth/confirm?next=${encodeURIComponent(next)}`;
+
+  const supabase = await createClient();
+  const { data, error } = await supabase.auth.signInWithOAuth({
+    provider: 'google',
+    options: { redirectTo },
+  });
+
+  if (error) {
+    redirect(
+      `/login?error=${encodeURIComponent(error.message)}&next=${encodeURIComponent(next)}` as never,
+    );
+  }
+  // Redireciona o browser pra tela de consentimento do Google.
+  redirect((data.url ?? '/login?error=oauth-sem-url') as never);
+}
+
 export async function signOut() {
   const supabase = await createClient();
   await supabase.auth.signOut();

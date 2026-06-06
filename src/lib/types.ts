@@ -8,14 +8,15 @@ export interface Profile {
   /** Temas amplos de interesse (multi). Pode ser profissão, hobby, curiosidade. */
   tema: string[];
 
-  /** Contexto da relação com o(s) tema(s): Profissão / Estudo / Hobby ou paixão / Curiosidade geral. */
-  contexto: string;
+  /** Contexto(s) da relação com o(s) tema(s): Profissão / Estudo / Hobby / Curiosidade.
+   *  Múltipla escolha — guarda slugs (ver onboarding-options). */
+  contexto: string[];
 
   /** Descrição livre opcional sobre o momento do usuário no tema (só faz sentido se contexto = Profissão ou Estudo). */
   descricao_livre: string;
 
-  /** Intent — o que o usuário quer ganhar lendo os emails. */
-  objetivo: string;
+  /** Intent(s) — o que o usuário quer ganhar lendo os emails. Múltipla escolha. */
+  objetivo: string[];
 
   /** Tags específicas que estão no radar do usuário (entidades, ferramentas, conceitos). */
   topicos: string[];
@@ -149,7 +150,7 @@ export function profileForPrompt(
   tema: string[];
   contexto: string;
   descricao_livre: string;
-  objetivo: string;
+  objetivo: string[];
   topicos: string[];
   referencias: string[];
   formatos: string[];
@@ -163,11 +164,14 @@ export function profileForPrompt(
   return {
     nome: profile.nome ?? '',
     tema: profile.tema ?? [],
-    // contexto é slug ('profession'...) → manda o rótulo legível no idioma-alvo
+    // contexto são slugs ('profession'...) → manda os rótulos legíveis no idioma
     // pra casar com a calibração da persona ("Profissão = técnico", etc.).
-    contexto: profile.contexto ? contextoLabel(profile.contexto, locale) : '',
+    contexto: (profile.contexto ?? [])
+      .map((c) => contextoLabel(c, locale))
+      .filter(Boolean)
+      .join(', '),
     descricao_livre: profile.descricao_livre ?? '',
-    objetivo: profile.objetivo ?? '',
+    objetivo: profile.objetivo ?? [],
     topicos,
     referencias: profile.referencias ?? [],
     formatos: profile.formatos ?? [],

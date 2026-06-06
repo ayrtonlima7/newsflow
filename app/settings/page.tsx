@@ -49,9 +49,9 @@ export default async function SettingsPage({
   const initial: ProfileUpdateInput = {
     nome: profile.nome ?? '',
     tema: profile.tema ?? [],
-    contexto: profile.contexto ?? '',
+    contexto: profile.contexto ?? [],
     descricao_livre: profile.descricao_livre ?? '',
-    objetivo: profile.objetivo ?? '',
+    objetivo: profile.objetivo ?? [],
     topicos: profile.topicos ?? [],
     referencias: profile.referencias ?? [],
     formatos: profile.formatos ?? [],

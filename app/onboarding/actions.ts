@@ -9,9 +9,9 @@ import type { Profile } from '@/src/lib/types';
 export interface TopicSuggestionsContext {
   nome: string;
   tema: string[];
-  contexto: string;
+  contexto: string[];
   descricao_livre: string;
-  objetivo: string;
+  objetivo: string[];
   referencias: string[];
   formatos: string[];
   ignorar: string[];
@@ -35,9 +35,9 @@ export async function generateTopicSuggestions(
 
     const contextLine = [
       `Tema(s) de interesse: ${ctx.tema.join(', ')}`,
-      `Contexto: ${ctx.contexto || 'não informado'}`,
+      `Contexto: ${ctx.contexto.length ? ctx.contexto.join(', ') : 'não informado'}`,
       ctx.descricao_livre ? `Sobre o usuário: ${ctx.descricao_livre}` : null,
-      ctx.objetivo ? `Objetivo: ${ctx.objetivo}` : null,
+      ctx.objetivo.length ? `Objetivo: ${ctx.objetivo.join(', ')}` : null,
       ctx.referencias.length > 0
         ? `Referências que o usuário admira/segue: ${ctx.referencias.join(', ')}`
         : null,
@@ -108,10 +108,10 @@ export async function saveProfile(profile: Profile): Promise<{ ok: boolean; erro
   if (!Array.isArray(profile.tema) || profile.tema.length === 0) {
     return { ok: false, error: 'escolha pelo menos um tema' };
   }
-  if (!profile.contexto?.trim()) {
+  if (!Array.isArray(profile.contexto) || profile.contexto.length === 0) {
     return { ok: false, error: 'escolha um contexto' };
   }
-  if (!profile.objetivo?.trim()) {
+  if (!Array.isArray(profile.objetivo) || profile.objetivo.length === 0) {
     return { ok: false, error: 'escolha um objetivo' };
   }
   if (!Array.isArray(profile.topicos) || profile.topicos.length === 0) {
@@ -123,9 +123,9 @@ export async function saveProfile(profile: Profile): Promise<{ ok: boolean; erro
 
   const topicos_busca = await normalizeTopics(profile.topicos, {
     tema: profile.tema,
-    contexto: profile.contexto,
+    contexto: profile.contexto.join(', '),
     descricao_livre: profile.descricao_livre,
-    objetivo: profile.objetivo,
+    objetivo: profile.objetivo.join(', '),
   });
 
   const { error } = await supabase.from('profiles').upsert(

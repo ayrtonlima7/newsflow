@@ -46,12 +46,18 @@ export function ConfirmCard({
           <ChipList items={profile.tema} />
         </Row>
         <Row label={t('confirm.context')}>
-          {profile.contexto ? contextoLabel(profile.contexto, locale) : <Empty />}
+          {profile.contexto.length ? (
+            <ChipList items={profile.contexto.map((c) => contextoLabel(c, locale))} />
+          ) : (
+            <Empty />
+          )}
         </Row>
         {profile.descricao_livre && (
           <Row label={t('confirm.about')}>{profile.descricao_livre}</Row>
         )}
-        <Row label={t('confirm.goal')}>{profile.objetivo || <Empty />}</Row>
+        <Row label={t('confirm.goal')}>
+          {profile.objetivo.length ? <ChipList items={profile.objetivo} /> : <Empty />}
+        </Row>
         <Row label={t('confirm.topics')}>
           <ChipList items={profile.topicos} />
         </Row>

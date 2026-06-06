@@ -64,9 +64,9 @@ async function main() {
   const profile: Profile = {
     nome: profileRow.nome ?? '',
     tema: profileRow.tema ?? [],
-    contexto: profileRow.contexto ?? '',
+    contexto: profileRow.contexto ?? [],
     descricao_livre: profileRow.descricao_livre ?? '',
-    objetivo: profileRow.objetivo ?? '',
+    objetivo: profileRow.objetivo ?? [],
     topicos: profileRow.topicos ?? [],
     topicos_busca: profileRow.topicos_busca ?? undefined,
     referencias: profileRow.referencias ?? [],

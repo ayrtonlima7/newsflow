@@ -84,9 +84,9 @@ Curate and email generation were **merged into a single LLM call** (was 2). `gen
 
 ### Profile shape — onboarding redesign (migration 0003)
 
-The onboarding was redesigned from "professional-centric" (area/cargo/tom) to "interest-centric". **The old columns `area`, `cargo`, `fontes_prioritarias`, `tom`, `descricoes_livres` were DROPPED in migration 0003.** Current `Profile` fields: `nome`, `tema[]`, `contexto`, `descricao_livre`, `objetivo`, `topicos[]`, `topicos_busca[]`, `referencias[]`, `formatos[]`, `ignorar[]`, `frequencia`, `horario`.
+The onboarding was redesigned from "professional-centric" (area/cargo/tom) to "interest-centric". **The old columns `area`, `cargo`, `fontes_prioritarias`, `tom`, `descricoes_livres` were DROPPED in migration 0003.** Current `Profile` fields: `nome`, `tema[]`, `contexto[]`, `descricao_livre`, `objetivo[]`, `topicos[]`, `topicos_busca[]`, `referencias[]`, `formatos[]`, `ignorar[]`, `frequencia`, `horario`. **`contexto` and `objetivo` are multi-select arrays** (migration 0012, `text → text[]`); `contexto` stores slugs (`profession`/`study`/`hobby`/`curiosity`) — see `src/lib/onboarding-options.ts`.
 
-`topicos` is what the user typed; `topicos_busca` is the LLM-normalized version (`topic-normalization.ts`, generated on save) used for search queries to avoid temporal markers / typos. `profileForPrompt()` in `src/lib/types.ts` swaps `topicos` for `topicos_busca` and shapes the object for prompts — **always use it**, never pass raw `Profile` to an LLM. Onboarding questions live in `app/onboarding/questions.ts` (10 questions; `descricao_livre` is conditional on `contexto ∈ {Profissão, Estudo}`).
+`topicos` is what the user typed; `topicos_busca` is the LLM-normalized version (`topic-normalization.ts`, generated on save) used for search queries to avoid temporal markers / typos. `profileForPrompt()` in `src/lib/types.ts` swaps `topicos` for `topicos_busca` and shapes the object for prompts — **always use it**, never pass raw `Profile` to an LLM. Onboarding questions live in `app/onboarding/questions.ts` — `getQuestions(locale)` (i18n); `descricao_livre` is conditional on `contexto` containing `profession` or `study`.
 
 ### Cron / scheduling
 

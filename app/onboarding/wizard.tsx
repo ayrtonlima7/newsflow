@@ -11,9 +11,9 @@ import type { Profile } from '@/src/lib/types';
 type Answers = {
   nome: string;
   tema: string[];
-  contexto: string;
+  contexto: string[];
   descricao_livre: string;
-  objetivo: string;
+  objetivo: string[];
   topicos: string[];
   referencias: string[];
   formatos: string[];
@@ -24,9 +24,9 @@ type Answers = {
 const empty: Answers = {
   nome: '',
   tema: [],
-  contexto: '',
+  contexto: [],
   descricao_livre: '',
-  objetivo: '',
+  objetivo: [],
   topicos: [],
   referencias: [],
   formatos: [],

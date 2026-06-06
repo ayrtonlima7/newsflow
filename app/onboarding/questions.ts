@@ -235,10 +235,10 @@ export function getQuestions(locale: Locale): Question[] {
       chips: TXT.tema.chips![locale], allowFree: true, minSelections: 1, required: true,
     },
     {
-      id: 'contexto', type: 'single',
+      id: 'contexto', type: 'multi',
       question: TXT.contexto.q[locale], helper: TXT.contexto.helper![locale],
       chips: ctx.map((o) => o.value), optionLabels: optLabels(ctx),
-      allowFree: false, required: true,
+      allowFree: false, minSelections: 1, required: true,
     },
     {
       id: 'descricao_livre', type: 'single',
@@ -248,9 +248,9 @@ export function getQuestions(locale: Locale): Question[] {
       required: false,
     },
     {
-      id: 'objetivo', type: 'single',
+      id: 'objetivo', type: 'multi',
       question: TXT.objetivo.q[locale], helper: TXT.objetivo.helper![locale],
-      chips: TXT.objetivo.chips![locale], allowFree: true, required: true,
+      chips: TXT.objetivo.chips![locale], allowFree: true, minSelections: 1, required: true,
     },
     {
       id: 'referencias', type: 'multi',
@@ -297,10 +297,13 @@ export function isQuestionShown(
   answers: Record<QuestionId, string | string[]>,
 ): boolean {
   if (!q.condicional) return true;
-  let val = answers[q.condicional.dependsOn];
-  if (q.condicional.dependsOn === 'contexto' && typeof val === 'string') {
-    val = normalizeContexto(val) ?? val;
+  const val = answers[q.condicional.dependsOn];
+  const isContexto = q.condicional.dependsOn === 'contexto';
+  // contexto agora é múltipla escolha (array de slugs); normaliza cada item.
+  if (Array.isArray(val)) {
+    const vals = isContexto ? val.map((v) => normalizeContexto(v) ?? v) : val;
+    return vals.some((v) => q.condicional!.values.includes(v));
   }
-  if (Array.isArray(val)) return val.some((v) => q.condicional!.values.includes(v));
-  return typeof val === 'string' && q.condicional.values.includes(val);
+  const single = isContexto && typeof val === 'string' ? (normalizeContexto(val) ?? val) : val;
+  return typeof single === 'string' && q.condicional.values.includes(single);
 }

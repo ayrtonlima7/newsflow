@@ -16,9 +16,9 @@ const DELIVERY_CODE_MAX_ATTEMPTS = 5;
 export interface ProfileUpdateInput {
   nome: string;
   tema: string[];
-  contexto: string;
+  contexto: string[];
   descricao_livre: string;
-  objetivo: string;
+  objetivo: string[];
   topicos: string[];
   referencias: string[];
   formatos: string[];
@@ -42,10 +42,10 @@ export async function updateProfile(
   if (!Array.isArray(input.tema) || input.tema.length === 0) {
     return { ok: false, error: 'escolha pelo menos um tema' };
   }
-  if (!input.contexto?.trim()) {
+  if (!Array.isArray(input.contexto) || input.contexto.length === 0) {
     return { ok: false, error: 'escolha um contexto' };
   }
-  if (!input.objetivo?.trim()) {
+  if (!Array.isArray(input.objetivo) || input.objetivo.length === 0) {
     return { ok: false, error: 'escolha um objetivo' };
   }
   if (!Array.isArray(input.topicos) || input.topicos.length === 0) {
@@ -63,9 +63,9 @@ export async function updateProfile(
 
   const topicos_busca = await normalizeTopics(input.topicos, {
     tema: input.tema,
-    contexto: input.contexto,
+    contexto: input.contexto.join(', '),
     descricao_livre: input.descricao_livre,
-    objetivo: input.objetivo,
+    objetivo: input.objetivo.join(', '),
   });
 
   const { error } = await supabase
@@ -139,9 +139,9 @@ export async function sendSampleNow(): Promise<SampleResult> {
   const profile: Profile = {
     nome: profileRow.nome ?? '',
     tema: profileRow.tema ?? [],
-    contexto: profileRow.contexto ?? '',
+    contexto: profileRow.contexto ?? [],
     descricao_livre: profileRow.descricao_livre ?? '',
-    objetivo: profileRow.objetivo ?? '',
+    objetivo: profileRow.objetivo ?? [],
     topicos: profileRow.topicos ?? [],
     topicos_busca: profileRow.topicos_busca ?? undefined,
     referencias: profileRow.referencias ?? [],

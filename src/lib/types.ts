@@ -1,3 +1,6 @@
+import type { Locale } from './i18n';
+import { contextoLabel, normalizeFrequencia } from './onboarding-options';
+
 export interface Profile {
   /** Como o usuário quer ser chamado nos emails. */
   nome: string;
@@ -98,7 +101,8 @@ export function frequenciaParaJanela(frequencia: string): JanelaFrescor {
   const today = new Date();
   const todayISO = today.toISOString().split('T')[0];
 
-  const f = frequencia.toLowerCase();
+  // Normaliza pra slug (tolera slug novo, rótulo PT legado e palavras-chave EN/ES).
+  const slug = normalizeFrequencia(frequencia);
 
   // Janela em dias + quantidade alvo de itens.
   // Quantidades incluem buffer pra validação dropar alguns; usuário recebe ~60-80%.
@@ -106,15 +110,11 @@ export function frequenciaParaJanela(frequencia: string): JanelaFrescor {
   let itemsMin = 5;
   let itemsMax = 8;
 
-  if (f.includes('semana')) {
+  if (slug === 'weekly') {
     janelaDias = 7;
     itemsMin = 10;
     itemsMax = 15;
-  } else if (
-    f.includes('3 dias') ||
-    f.includes('três dias') ||
-    f.includes('tres dias')
-  ) {
+  } else if (slug === 'every3days') {
     janelaDias = 3;
     itemsMin = 7;
     itemsMax = 10;
@@ -141,7 +141,10 @@ export function frequenciaParaJanela(frequencia: string): JanelaFrescor {
  * Versão do Profile vista pelos prompts da IA. Substitui `topicos` pela versão
  * normalizada (`topicos_busca`) quando disponível e remove campos internos.
  */
-export function profileForPrompt(profile: Profile): {
+export function profileForPrompt(
+  profile: Profile,
+  locale: Locale = 'pt',
+): {
   nome: string;
   tema: string[];
   contexto: string;
@@ -160,7 +163,9 @@ export function profileForPrompt(profile: Profile): {
   return {
     nome: profile.nome ?? '',
     tema: profile.tema ?? [],
-    contexto: profile.contexto ?? '',
+    // contexto é slug ('profession'...) → manda o rótulo legível no idioma-alvo
+    // pra casar com a calibração da persona ("Profissão = técnico", etc.).
+    contexto: profile.contexto ? contextoLabel(profile.contexto, locale) : '',
     descricao_livre: profile.descricao_livre ?? '',
     objetivo: profile.objetivo ?? '',
     topicos,

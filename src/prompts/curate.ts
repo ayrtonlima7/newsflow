@@ -49,7 +49,7 @@ export function buildCurateFromResultsPrompt(
   locale: Locale = 'pt',
 ): { system: string; user: string } {
   const janela = frequenciaParaJanela(profile.frequencia);
-  const p = profileForPrompt(profile);
+  const p = profileForPrompt(profile, locale);
 
   const system = SYSTEM_BY_LOCALE[locale];
 

@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import type { Question } from './questions';
+import { useT } from '../_i18n/provider';
 
 interface Props {
   question: Question;
@@ -13,9 +14,12 @@ interface Props {
 }
 
 export function StepCard({ question, value, onChange, loading, dynamicChips }: Props) {
+  const t = useT();
   const chips =
     question.type === 'multi' && question.dynamic ? (dynamicChips ?? []) : question.chips;
   const isMulti = question.type === 'multi';
+  // Rótulo de um valor de chip: traduzido (contexto/frequencia) ou o próprio valor.
+  const labelFor = (v: string) => question.optionLabels?.[v] ?? v;
 
   const [freeText, setFreeText] = useState('');
 
@@ -101,7 +105,7 @@ export function StepCard({ question, value, onChange, loading, dynamicChips }: P
       {/* Caso 4: LOADING genérico (não inputFirst, mas dinâmico) */}
       {!question.multiline && !isSingleFreeText && !question.inputFirst && loading && (
         <div className="rounded-md bg-white border border-[var(--color-border)] p-6 text-sm text-[var(--color-muted)]">
-          ✨ Gerando sugestões personalizadas para você…
+          {t('onb.genLoading')}
         </div>
       )}
 
@@ -111,6 +115,7 @@ export function StepCard({ question, value, onChange, loading, dynamicChips }: P
           value={value}
           isMulti={isMulti}
           chips={chips}
+          labelFor={labelFor}
           toggleChip={toggleChip}
           onClearSingle={() => onChange('')}
         />
@@ -135,7 +140,7 @@ export function StepCard({ question, value, onChange, loading, dynamicChips }: P
                 }
               }}
               placeholder={
-                question.placeholder ?? (isMulti ? 'Adicionar outro…' : 'Outro: descreva')
+                question.placeholder ?? (isMulti ? t('onb.addAnother') : t('onb.other'))
               }
               className="flex-1 rounded-md border border-[var(--color-border)] bg-white px-4 py-2 text-sm outline-none transition focus:border-[var(--color-fg)]"
             />
@@ -145,7 +150,7 @@ export function StepCard({ question, value, onChange, loading, dynamicChips }: P
               disabled={!freeText.trim()}
               className="rounded-md border border-[var(--color-border)] bg-white px-4 py-2 text-sm transition hover:border-[var(--color-fg)] disabled:opacity-50"
             >
-              Adicionar
+              {t('onb.add')}
             </button>
           </div>
         )}
@@ -159,12 +164,14 @@ function ChipsFirstLayout({
   value,
   isMulti,
   chips,
+  labelFor,
   toggleChip,
   onClearSingle,
 }: {
   value: string | string[];
   isMulti: boolean;
   chips: string[];
+  labelFor: (v: string) => string;
   toggleChip: (chip: string) => void;
   onClearSingle: () => void;
 }) {
@@ -192,7 +199,7 @@ function ChipsFirstLayout({
                 : 'border-[var(--color-border)] bg-white hover:border-[var(--color-fg)]',
             )}
           >
-            {chip}
+            {labelFor(chip)}
           </button>
         );
       })}
@@ -204,7 +211,7 @@ function ChipsFirstLayout({
           onClick={onClearSingle}
           className="rounded-full border border-[var(--color-fg)] bg-[var(--color-fg)] text-white px-4 py-2 text-sm transition hover:opacity-90"
         >
-          {singleCustom} ✕
+          {labelFor(singleCustom)} ✕
         </button>
       )}
 
@@ -253,6 +260,7 @@ function InputFirstLayout({
   onClearSingle: () => void;
   loading?: boolean;
 }) {
+  const t = useT();
   const selected = isMulti ? (Array.isArray(value) ? value : []) : [];
   const singleVal = !isMulti && typeof value === 'string' && value ? value : null;
   const remainingChips = chips.filter(
@@ -273,7 +281,7 @@ function InputFirstLayout({
               addFreeText();
             }
           }}
-          placeholder={question.placeholder ?? 'Digite e pressione Enter'}
+          placeholder={question.placeholder ?? t('onb.typeEnter')}
           className="flex-1 rounded-md border-2 border-[var(--color-border)] bg-white px-4 py-3 text-base outline-none transition focus:border-[var(--color-fg)]"
         />
         <button
@@ -282,7 +290,7 @@ function InputFirstLayout({
           disabled={!freeText.trim()}
           className="rounded-md bg-[var(--color-fg)] px-4 py-3 text-sm font-medium text-white transition hover:opacity-90 disabled:opacity-50"
         >
-          Adicionar
+          {t('onb.add')}
         </button>
       </div>
 
@@ -320,10 +328,7 @@ function InputFirstLayout({
         <div className="space-y-2 pt-2">
           <div className="flex items-center gap-2 text-sm text-[var(--color-muted)]">
             <SpinnerIcon />
-            <span>
-              ✨ Combinando suas respostas e buscando sugestões pra você… (pode levar
-              ~15s)
-            </span>
+            <span>{t('onb.combining')}</span>
           </div>
           {/* Skeleton pills pra dar peso visual durante o load */}
           <div className="flex flex-wrap gap-1.5">
@@ -341,9 +346,7 @@ function InputFirstLayout({
       {/* Sugestões discretas, com prefixo "+" (só quando não tá carregando) */}
       {!loading && remainingChips.length > 0 && (
         <div className="space-y-2 pt-2">
-          <p className="text-xs text-[var(--color-muted)]">
-            Sem ideias? Aqui vão sugestões pra você:
-          </p>
+          <p className="text-xs text-[var(--color-muted)]">{t('onb.noIdeas')}</p>
           <div className="flex flex-wrap gap-1.5">
             {remainingChips.map((chip) => (
               <button

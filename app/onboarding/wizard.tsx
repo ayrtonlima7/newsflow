@@ -1,10 +1,11 @@
 'use client';
 
-import { useState, useTransition } from 'react';
-import { questions, isQuestionShown, type QuestionId } from './questions';
+import { useMemo, useState, useTransition } from 'react';
+import { getQuestions, isQuestionShown, type QuestionId } from './questions';
 import { StepCard } from './step-card';
 import { ConfirmCard } from './confirm-card';
 import { generateTopicSuggestions } from './actions';
+import { useT, useLocale } from '../_i18n/provider';
 import type { Profile } from '@/src/lib/types';
 
 type Answers = {
@@ -34,6 +35,9 @@ const empty: Answers = {
 };
 
 export function OnboardingWizard({ userEmail }: { userEmail: string }) {
+  const t = useT();
+  const locale = useLocale();
+  const questions = useMemo(() => getQuestions(locale), [locale]);
   const [step, setStep] = useState(0);
   const [answers, setAnswers] = useState<Answers>(empty);
   const [dynamicTopics, setDynamicTopics] = useState<string[]>([]);
@@ -170,9 +174,7 @@ export function OnboardingWizard({ userEmail }: { userEmail: string }) {
   return (
     <div className="space-y-8">
       <div className="flex items-center justify-between text-xs text-[var(--color-muted)]">
-        <span>
-          Pergunta {visibleIndex + 1} de {visibleTotal}
-        </span>
+        <span>{t('onb.progress', { n: visibleIndex + 1, total: visibleTotal })}</span>
         <span>{userEmail}</span>
       </div>
 
@@ -193,7 +195,7 @@ export function OnboardingWizard({ userEmail }: { userEmail: string }) {
 
       {topicsError && currentQuestion!.id === 'topicos' && (
         <p className="text-sm text-amber-700">
-          {topicsError}. Você ainda pode adicionar tópicos manualmente.
+          {topicsError}. {t('onb.topicsErrorSuffix')}
         </p>
       )}
 
@@ -204,7 +206,7 @@ export function OnboardingWizard({ userEmail }: { userEmail: string }) {
           disabled={step === 0 || loadingTopics}
           className="rounded-md border border-[var(--color-border)] bg-white px-4 py-2 text-sm transition hover:border-[var(--color-fg)] disabled:opacity-40"
         >
-          Voltar
+          {t('onb.back')}
         </button>
         <button
           type="button"
@@ -212,7 +214,7 @@ export function OnboardingWizard({ userEmail }: { userEmail: string }) {
           disabled={!canAdvance() || loadingTopics}
           className="rounded-md bg-[var(--color-accent)] px-6 py-2 text-sm font-medium text-[var(--color-accent-fg)] transition hover:opacity-90 disabled:opacity-40"
         >
-          {visibleIndex === visibleTotal - 1 ? 'Revisar' : 'Próxima'}
+          {visibleIndex === visibleTotal - 1 ? t('onb.review') : t('onb.next')}
         </button>
       </div>
     </div>

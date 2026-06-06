@@ -3,6 +3,8 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { saveProfile } from './actions';
+import { useT, useLocale } from '../_i18n/provider';
+import { contextoLabel, frequenciaLabel } from '@/src/lib/onboarding-options';
 import type { Profile } from '@/src/lib/types';
 
 export function ConfirmCard({
@@ -13,6 +15,8 @@ export function ConfirmCard({
   onEdit: () => void;
 }) {
   const router = useRouter();
+  const t = useT();
+  const locale = useLocale();
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -31,40 +35,42 @@ export function ConfirmCard({
     <div className="space-y-6">
       <div className="space-y-2">
         <h2 className="text-2xl font-semibold tracking-tight">
-          {profile.nome ? `Tudo certo, ${profile.nome}?` : 'Tudo certo?'}
+          {profile.nome ? t('confirm.titleNamed', { nome: profile.nome }) : t('confirm.title')}
         </h2>
-        <p className="text-sm text-[var(--color-muted)]">
-          Confere se está tudo como você quer. Pode editar a qualquer momento depois.
-        </p>
+        <p className="text-sm text-[var(--color-muted)]">{t('confirm.subtitle')}</p>
       </div>
 
       <dl className="space-y-4 rounded-lg border border-[var(--color-border)] bg-white p-6 text-sm">
-        <Row label="Nome">{profile.nome || <Empty />}</Row>
-        <Row label="Tema(s)">
+        <Row label={t('confirm.name')}>{profile.nome || <Empty />}</Row>
+        <Row label={t('confirm.theme')}>
           <ChipList items={profile.tema} />
         </Row>
-        <Row label="Contexto">{profile.contexto || <Empty />}</Row>
+        <Row label={t('confirm.context')}>
+          {profile.contexto ? contextoLabel(profile.contexto, locale) : <Empty />}
+        </Row>
         {profile.descricao_livre && (
-          <Row label="Sobre você">{profile.descricao_livre}</Row>
+          <Row label={t('confirm.about')}>{profile.descricao_livre}</Row>
         )}
-        <Row label="Objetivo">{profile.objetivo || <Empty />}</Row>
-        <Row label="Tópicos">
+        <Row label={t('confirm.goal')}>{profile.objetivo || <Empty />}</Row>
+        <Row label={t('confirm.topics')}>
           <ChipList items={profile.topicos} />
         </Row>
         {profile.referencias.length > 0 && (
-          <Row label="Referências">
+          <Row label={t('confirm.refs')}>
             <ChipList items={profile.referencias} />
           </Row>
         )}
-        <Row label="Formatos">
+        <Row label={t('confirm.formats')}>
           <ChipList items={profile.formatos} />
         </Row>
         {profile.ignorar.length > 0 && (
-          <Row label="Ignorar">
+          <Row label={t('confirm.ignore')}>
             <ChipList items={profile.ignorar} muted />
           </Row>
         )}
-        <Row label="Frequência">{profile.frequencia || <Empty />}</Row>
+        <Row label={t('confirm.frequency')}>
+          {profile.frequencia ? frequenciaLabel(profile.frequencia, locale) : <Empty />}
+        </Row>
       </dl>
 
       {error && (
@@ -80,7 +86,7 @@ export function ConfirmCard({
           disabled={saving}
           className="inline-flex items-center justify-center rounded-md bg-[var(--color-accent)] px-6 py-3 text-sm font-medium text-[var(--color-accent-fg)] transition hover:opacity-90 disabled:opacity-50"
         >
-          {saving ? 'Salvando…' : 'Confirmar e salvar'}
+          {saving ? t('confirm.saving') : t('confirm.confirm')}
         </button>
         <button
           type="button"
@@ -88,7 +94,7 @@ export function ConfirmCard({
           disabled={saving}
           className="inline-flex items-center justify-center rounded-md border border-[var(--color-border)] bg-white px-6 py-3 text-sm font-medium transition hover:border-[var(--color-fg)] disabled:opacity-50"
         >
-          Voltar e editar
+          {t('confirm.backEdit')}
         </button>
       </div>
     </div>

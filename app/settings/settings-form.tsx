@@ -3,8 +3,9 @@
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
-import { questions, isQuestionShown, type QuestionId } from '@/app/onboarding/questions';
+import { getQuestions, isQuestionShown, type QuestionId } from '@/app/onboarding/questions';
 import { StepCard } from '@/app/onboarding/step-card';
+import { useLocale } from '@/app/_i18n/provider';
 import { updateProfile, setActive, type ProfileUpdateInput } from './actions';
 
 interface Props {
@@ -16,6 +17,8 @@ type Feedback = { kind: 'saved'; text?: string } | { kind: 'error'; text: string
 
 export function SettingsForm({ initial, isActive: initialActive }: Props) {
   const router = useRouter();
+  const locale = useLocale();
+  const questions = getQuestions(locale);
   const [values, setValues] = useState<ProfileUpdateInput>(initial);
   const [active, setActiveState] = useState(initialActive);
   const [pending, startTransition] = useTransition();

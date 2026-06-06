@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { runDeliveryPipeline } from '@/src/lib/delivery';
 import type { Profile } from '@/src/lib/types';
+import { normalizeFrequencia } from '@/src/lib/onboarding-options';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -42,23 +43,18 @@ function alreadyDeliveredThisPeriod(
   lastDeliveredAt: string,
   now: Date,
 ): boolean {
-  const f = frequencia.toLowerCase();
+  const slug = normalizeFrequencia(frequencia);
   const last = new Date(lastDeliveredAt);
 
   // Diária → comparação de dia-calendário
-  if (
-    !f.includes('semana') &&
-    !f.includes('3 dias') &&
-    !f.includes('três dias') &&
-    !f.includes('tres dias')
-  ) {
+  if (slug === 'daily') {
     return spDateString(last) === spDateString(now);
   }
 
   // 3 dias / semanal → janela deslizante com folga
   const diffDays = (now.getTime() - last.getTime()) / (24 * 3600_000);
-  if (f.includes('semana')) return diffDays < 6;
-  return diffDays < 2.5; // 3 dias
+  if (slug === 'weekly') return diffDays < 6;
+  return diffDays < 2.5; // every3days
 }
 
 type ProfileRow = Profile & {

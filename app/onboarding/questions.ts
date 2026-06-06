@@ -26,6 +26,8 @@ type BaseQuestion = {
   chips: string[];
   /** Rótulo exibido por valor de chip (quando valor ≠ rótulo, ex: contexto/frequencia slugs). */
   optionLabels?: Record<string, string>;
+  /** Renderiza um picker de hora (dropdown 00:00–23:00) além dos chips rápidos. */
+  timePicker?: boolean;
   allowFree: boolean;
   multiline?: boolean;
   inputFirst?: boolean;
@@ -284,8 +286,8 @@ export function getQuestions(locale: Locale): Question[] {
     {
       id: 'horario', type: 'single',
       question: TXT.horario.q[locale], helper: TXT.horario.helper![locale],
-      chips: ['06:00', '08:00', '12:00', '18:00', '21:00'], allowFree: true,
-      placeholder: TXT.horario.placeholder![locale], required: true,
+      chips: ['06:00', '08:00', '12:00', '18:00', '21:00'],
+      timePicker: true, allowFree: false, required: true,
     },
   ];
 }

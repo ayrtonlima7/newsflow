@@ -5,6 +5,9 @@ import { cn } from '@/lib/utils';
 import type { Question } from './questions';
 import { useT } from '../_i18n/provider';
 
+/** Horas cheias 00:00–23:00 pro picker de horário. */
+const HOURS = Array.from({ length: 24 }, (_, h) => `${String(h).padStart(2, '0')}:00`);
+
 interface Props {
   question: Question;
   value: string | string[];
@@ -119,6 +122,24 @@ export function StepCard({ question, value, onChange, loading, dynamicChips }: P
           toggleChip={toggleChip}
           onClearSingle={() => onChange('')}
         />
+      )}
+
+      {/* Picker de hora — dropdown 00:00–23:00 (horario), além dos chips rápidos */}
+      {!question.multiline && !loading && question.timePicker && (
+        <select
+          value={typeof value === 'string' && HOURS.includes(value) ? value : ''}
+          onChange={(e) => onChange(e.target.value)}
+          className="w-full rounded-md border border-[var(--color-border)] bg-white px-4 py-3 text-base outline-none transition focus:border-[var(--color-fg)]"
+        >
+          <option value="" disabled>
+            {t('onb.otherHour')}
+          </option>
+          {HOURS.map((h) => (
+            <option key={h} value={h}>
+              {h}
+            </option>
+          ))}
+        </select>
       )}
 
       {/* Free-text complementar — só pra chips-first com allowFree.

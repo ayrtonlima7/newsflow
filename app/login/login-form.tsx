@@ -2,6 +2,7 @@
 
 import { useActionState, useState } from 'react';
 import { requestMagicLink, signInWithGoogle, type LoginState } from './actions';
+import { useT } from '../_i18n/provider';
 
 const initial: LoginState = { status: 'idle' };
 const IS_DEV = process.env.NODE_ENV === 'development';
@@ -30,6 +31,7 @@ function GoogleIcon() {
 }
 
 export function LoginForm({ next }: { next?: string }) {
+  const t = useT();
   const [state, formAction, pending] = useActionState(requestMagicLink, initial);
   const [showEmail, setShowEmail] = useState(IS_DEV);
 
@@ -39,15 +41,11 @@ export function LoginForm({ next }: { next?: string }) {
     return (
       <div className="rounded-lg border border-[var(--color-border)] bg-white p-6 space-y-3">
         <p className="text-2xl">📬</p>
-        <h2 className="text-lg font-medium">Link mágico a caminho</h2>
+        <h2 className="text-lg font-medium">{t('login.sentTitle')}</h2>
         <p className="text-sm text-[var(--color-muted)]">
-          Mandamos um link para{' '}
-          <span className="font-medium text-[var(--color-fg)]">{state.email}</span>. Clica
-          nele para entrar — pode levar até 1 minuto para chegar.
+          {t('login.sentBody', { email: state.email })}
         </p>
-        <p className="text-xs text-[var(--color-muted)]">
-          Não chegou? Veja a pasta de spam. Ou tente de novo com outro email.
-        </p>
+        <p className="text-xs text-[var(--color-muted)]">{t('login.sentSpam')}</p>
       </div>
     );
   }
@@ -62,7 +60,7 @@ export function LoginForm({ next }: { next?: string }) {
           className="flex w-full items-center justify-center gap-3 rounded-md border border-[var(--color-border)] bg-white px-6 py-3 text-sm font-medium text-[var(--color-fg)] transition hover:bg-stone-50"
         >
           <GoogleIcon />
-          Continuar com Google
+          {t('login.google')}
         </button>
       </form>
 
@@ -77,13 +75,13 @@ export function LoginForm({ next }: { next?: string }) {
           onClick={() => setShowEmail(true)}
           className="mx-auto block text-xs text-[var(--color-muted)] underline hover:text-[var(--color-fg)]"
         >
-          Prefere entrar com email?
+          {t('login.preferEmail')}
         </button>
       ) : (
         <>
           <div className="flex items-center gap-3">
             <span className="h-px flex-1 bg-[var(--color-border)]" />
-            <span className="text-xs text-[var(--color-muted)]">ou com email</span>
+            <span className="text-xs text-[var(--color-muted)]">{t('login.orEmail')}</span>
             <span className="h-px flex-1 bg-[var(--color-border)]" />
           </div>
 
@@ -98,14 +96,14 @@ export function LoginForm({ next }: { next?: string }) {
             <input type="hidden" name="next" value={next ?? '/onboarding'} />
             <div className="space-y-1.5">
               <label htmlFor="email" className="text-sm font-medium">
-                Email
+                {t('login.emailLabel')}
               </label>
               <input
                 id="email"
                 name="email"
                 type="email"
                 required
-                placeholder="voce@email.com"
+                placeholder={t('login.emailPlaceholder')}
                 className="w-full rounded-md border border-[var(--color-border)] bg-white px-4 py-3 text-base outline-none transition focus:border-[var(--color-fg)]"
               />
             </div>
@@ -114,7 +112,7 @@ export function LoginForm({ next }: { next?: string }) {
               disabled={pending}
               className="w-full rounded-md bg-[var(--color-accent)] px-6 py-3 text-sm font-medium text-[var(--color-accent-fg)] transition hover:opacity-90 disabled:opacity-50"
             >
-              {pending ? (IS_DEV ? 'Entrando…' : 'Enviando…') : IS_DEV ? 'Entrar (dev)' : 'Enviar link mágico'}
+              {pending ? (IS_DEV ? 'Entrando…' : t('login.sending')) : IS_DEV ? 'Entrar (dev)' : t('login.sendMagic')}
             </button>
           </form>
         </>

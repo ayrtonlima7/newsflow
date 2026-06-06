@@ -355,34 +355,6 @@ export async function confirmDeliveryEmail(
   return { ok: true };
 }
 
-/** Atualiza o idioma do usuário (curadoria + emails + futura UI). */
-export async function updateIdioma(
-  locale: string,
-): Promise<{ ok: boolean; error?: string }> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { ok: false, error: 'não autenticado' };
-
-  if (locale !== 'pt' && locale !== 'en' && locale !== 'es') {
-    return { ok: false, error: 'idioma inválido' };
-  }
-
-  const { error } = await supabase
-    .from('profiles')
-    .update({ idioma: locale })
-    .eq('user_id', user.id);
-
-  if (error) {
-    console.error('[updateIdioma] erro:', error);
-    return { ok: false, error: error.message };
-  }
-
-  revalidatePath('/settings');
-  return { ok: true };
-}
-
 export async function setActive(
   active: boolean,
 ): Promise<{ ok: boolean; error?: string }> {

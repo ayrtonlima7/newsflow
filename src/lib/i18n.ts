@@ -8,6 +8,9 @@ export type Locale = 'pt' | 'en' | 'es';
 export const LOCALES: readonly Locale[] = ['pt', 'en', 'es'];
 export const DEFAULT_LOCALE: Locale = 'pt';
 
+/** Cookie que guarda o idioma escolhido (fonte de renderização da UI). */
+export const LOCALE_COOKIE = 'nf_locale';
+
 export function isLocale(v: unknown): v is Locale {
   return v === 'pt' || v === 'en' || v === 'es';
 }

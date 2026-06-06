@@ -1,5 +1,6 @@
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
+import { LOCALE_COOKIE, localeFromAcceptLanguage } from '@/src/lib/i18n';
 
 const PROTECTED_PREFIXES = ['/onboarding', '/settings', '/dashboard'];
 
@@ -38,6 +39,17 @@ export async function middleware(request: NextRequest) {
     url.pathname = '/login';
     url.searchParams.set('next', path);
     return NextResponse.redirect(url);
+  }
+
+  // Primeira visita sem cookie de idioma → detecta do Accept-Language e fixa,
+  // pra UI já abrir no idioma do navegador (estrangeiro não cai em PT).
+  if (!request.cookies.get(LOCALE_COOKIE)) {
+    const detected = localeFromAcceptLanguage(request.headers.get('accept-language'));
+    response.cookies.set(LOCALE_COOKIE, detected, {
+      path: '/',
+      maxAge: 60 * 60 * 24 * 365,
+      sameSite: 'lax',
+    });
   }
 
   return response;

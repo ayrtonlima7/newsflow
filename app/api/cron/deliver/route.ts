@@ -192,7 +192,8 @@ export async function GET(req: NextRequest) {
           horario: profile.horario ?? '8h',
         },
       },
-      { dryRun },
+      // force=1 também pula o gate de assinatura (pra admin testar)
+      { dryRun, skipGate: ignoreSchedule },
     );
 
     results.push({

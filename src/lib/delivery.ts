@@ -1,6 +1,7 @@
 import { Resend } from 'resend';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { generateBriefing, generateEmail } from './pipeline';
+import { canDeliver, type SubscriptionStatus } from './subscription';
 import type { Profile } from './types';
 
 export interface DeliveryInput {
@@ -12,9 +13,16 @@ export interface DeliveryInput {
 export interface DeliveryOptions {
   dryRun?: boolean;
   overrideTo?: string;
+  /** Pula o gating de assinatura (ex: admin forçando). Default false. */
+  skipGate?: boolean;
 }
 
-export type DeliveryStatus = 'sent' | 'failed' | 'skipped_empty' | 'dry_run';
+export type DeliveryStatus =
+  | 'sent'
+  | 'failed'
+  | 'skipped_empty'
+  | 'skipped_gate'
+  | 'dry_run';
 
 export interface DeliveryResult {
   deliveryId: string | null;
@@ -34,6 +42,26 @@ function appUrl(): string {
   );
 }
 
+/** Lê o status de assinatura e aplica o gating (Stripe é a fonte da verdade). */
+async function checkGate(
+  supabase: ReturnType<typeof createAdminClient>,
+  userId: string,
+): Promise<{ allowed: boolean; reason: string }> {
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('subscription_status')
+    .eq('user_id', userId)
+    .maybeSingle();
+
+  const status = (profile?.subscription_status ?? 'free') as SubscriptionStatus;
+
+  const gate = canDeliver(status);
+  if (!gate.allowed) {
+    console.log(`[delivery] bloqueado pelo gate: ${gate.reason} (user ${userId})`);
+  }
+  return { allowed: gate.allowed, reason: gate.reason };
+}
+
 export async function runDeliveryPipeline(
   input: DeliveryInput,
   opts: DeliveryOptions = {},
@@ -45,6 +73,21 @@ export async function runDeliveryPipeline(
   let costBrl = 0;
 
   try {
+    // --- Gating de assinatura/trial — ANTES de gastar tokens de IA ---
+    if (!opts.skipGate) {
+      const gate = await checkGate(supabase, input.userId);
+      if (!gate.allowed) {
+        return {
+          deliveryId: null,
+          briefingId: null,
+          status: 'skipped_gate',
+          costBrl: 0,
+          elapsedSeconds: (Date.now() - t0) / 1000,
+          error: gate.reason,
+        };
+      }
+    }
+
     const { briefing, meta: curateMeta } = await generateBriefing(input.profile);
     costBrl += curateMeta.cost.totalBRL;
 

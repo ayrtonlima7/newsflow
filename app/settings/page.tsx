@@ -4,6 +4,8 @@ import { createClient } from '@/lib/supabase/server';
 import { signOut } from '@/app/login/actions';
 import { SettingsForm } from './settings-form';
 import { SampleCard } from './sample-card';
+import { SubscriptionCard } from './subscription-card';
+import { canDeliver, type SubscriptionStatus } from '@/src/lib/subscription';
 import type { ProfileUpdateInput } from './actions';
 
 // O pipeline (curate + email + send) pode levar ~60s. Server actions desta rota herdam.
@@ -12,9 +14,9 @@ export const maxDuration = 60;
 export default async function SettingsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ welcome?: string }>;
+  searchParams: Promise<{ welcome?: string; sub?: string }>;
 }) {
-  const { welcome } = await searchParams;
+  const { welcome, sub } = await searchParams;
 
   const supabase = await createClient();
   const {
@@ -32,6 +34,11 @@ export default async function SettingsPage({
   if (!profile) redirect('/onboarding');
 
   const isAdmin = !!process.env.ADMIN_EMAIL && user.email === process.env.ADMIN_EMAIL;
+
+  // Estado de assinatura pro card (Stripe é a fonte da verdade)
+  const gate = canDeliver(
+    (profile.subscription_status ?? 'free') as SubscriptionStatus,
+  );
 
   const initial: ProfileUpdateInput = {
     nome: profile.nome ?? '',
@@ -80,12 +87,26 @@ export default async function SettingsPage({
 
       {welcome && (
         <div className="rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
-          ✓ Perfil salvo! O primeiro email vai chegar na frequência que você escolheu — ou clique
-          abaixo pra receber um exemplo agora.
+          {gate.allowed
+            ? '✓ Perfil salvo! O primeiro email vai chegar na frequência que você escolheu — ou clique abaixo pra receber um exemplo agora.'
+            : '✓ Perfil salvo! Comece seu mês grátis abaixo pra ativar a curadoria — o primeiro email chega na frequência que você escolheu.'}
         </div>
       )}
 
-      <SampleCard userEmail={user.email ?? ''} lastDeliveredAt={profile.last_delivered_at} />
+      <SubscriptionCard
+        gateState={gate.state}
+        plan={profile.plan ?? null}
+        currentPeriodEnd={profile.current_period_end ?? null}
+        cancelAtPeriodEnd={profile.cancel_at_period_end ?? false}
+        trialEnd={profile.trial_end ?? null}
+        justSubscribed={sub === 'success'}
+      />
+
+      {/* Amostra só pra quem está liberado (assinante/trial). Free vê o card de
+          assinatura acima — o "test drive" do produto é o trial de 30 dias. */}
+      {gate.allowed && (
+        <SampleCard userEmail={user.email ?? ''} lastDeliveredAt={profile.last_delivered_at} />
+      )}
 
       <SettingsForm initial={initial} isActive={profile.is_active} />
     </main>

@@ -84,7 +84,8 @@ async function main() {
 
   const result = await runDeliveryPipeline(
     { userId, email: userEmail, profile },
-    { dryRun },
+    // CLI é ferramenta admin → pula o gate de assinatura
+    { dryRun, skipGate: true },
   );
 
   console.log(`\n[deliver] status=${result.status}`);

@@ -169,6 +169,15 @@ export async function sendSampleNow(): Promise<SampleResult> {
       elapsedSeconds: result.elapsedSeconds,
     };
   }
+  // Defensivo: o botão só aparece pra quem está liberado, mas o gate é
+  // reavaliado no envio (status pode ter mudado). Não conta como "enviado".
+  if (result.status === 'skipped_gate') {
+    return {
+      ok: false,
+      error: 'comece seu mês grátis pra receber a curadoria.',
+      status: result.status,
+    };
+  }
   return {
     ok: true,
     itemsCount: result.itemsCount,

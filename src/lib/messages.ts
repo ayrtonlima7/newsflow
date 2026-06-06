@@ -59,6 +59,7 @@ const pt: Dictionary = {
   'onb.combining': '✨ Combinando suas respostas e buscando sugestões pra você… (pode levar ~15s)',
   'onb.noIdeas': 'Sem ideias? Aqui vão sugestões pra você:',
   'onb.topicsErrorSuffix': 'Você ainda pode adicionar tópicos manualmente.',
+  'onb.otherHour': 'Outro horário…',
 
   // confirmação do onboarding
   'confirm.title': 'Tudo certo?',
@@ -198,6 +199,7 @@ const en: Dictionary = {
   'onb.combining': '✨ Combining your answers and finding suggestions for you… (may take ~15s)',
   'onb.noIdeas': 'Out of ideas? Here are some suggestions:',
   'onb.topicsErrorSuffix': 'You can still add topics manually.',
+  'onb.otherHour': 'Another time…',
 
   'confirm.title': 'All set?',
   'confirm.titleNamed': 'All set, {nome}?',
@@ -332,6 +334,7 @@ const es: Dictionary = {
   'onb.combining': '✨ Combinando tus respuestas y buscando sugerencias para ti… (puede tardar ~15s)',
   'onb.noIdeas': '¿Sin ideas? Aquí van algunas sugerencias:',
   'onb.topicsErrorSuffix': 'Todavía puedes añadir temas manualmente.',
+  'onb.otherHour': 'Otra hora…',
 
   'confirm.title': '¿Todo bien?',
   'confirm.titleNamed': '¿Todo bien, {nome}?',

@@ -15,7 +15,9 @@
     "deliver": "tsx src/cli/deliver.ts",
     "preview": "tsx src/cli/preview.ts",
     "reset-users": "tsx src/cli/reset-users.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",
@@ -38,6 +40,7 @@
     "@types/react-dom": "^19.0.0",
     "tailwindcss": "^4.0.0",
     "tsx": "^4.19.0",
-    "typescript": "^5.7.0"
+    "typescript": "^5.7.0",
+    "vitest": "^4.1.8"
   }
 }

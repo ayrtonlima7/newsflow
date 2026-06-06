@@ -34,6 +34,11 @@ create table if not exists public.comp_codes (
 -- leitura pública — o resgate roda numa server action com admin client.
 alter table public.comp_codes enable row level security;
 
--- Exemplo de criação de cupom (rode separado, ajustando os valores):
--- insert into public.comp_codes (code, label, max_redemptions)
--- values ('AMIGO-NEWSFLOW', 'Beta amigos', 20);
+-- Criação de cupom (rode SEPARADO no SQL Editor, NÃO versione o código real):
+-- use um valor ALEATÓRIO/alta entropia, não uma palavra adivinhável, e prefira
+-- definir expiração. O código real só deve existir no banco — nunca no Git.
+-- insert into public.comp_codes (code, label, max_redemptions, expires_at)
+-- values ('SEU-CUPOM-AQUI', 'Beta amigos', 20, now() + interval '30 days');
+--
+-- Revogar na hora (sem redeploy — a validação lê a tabela ao vivo):
+-- update public.comp_codes set is_active = false where code = 'SEU-CUPOM-AQUI';

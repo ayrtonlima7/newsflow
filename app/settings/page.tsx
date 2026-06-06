@@ -7,6 +7,8 @@ import { SampleCard } from './sample-card';
 import { SubscriptionCard } from './subscription-card';
 import { DeliveryEmailCard } from './delivery-email-card';
 import { canDeliver, type SubscriptionStatus } from '@/src/lib/subscription';
+import { getLocale } from '../_i18n/locale';
+import { getDictionary, translate } from '@/src/lib/messages';
 import type { ProfileUpdateInput } from './actions';
 
 // O pipeline (curate + email + send) pode levar ~60s. Server actions desta rota herdam.
@@ -41,6 +43,9 @@ export default async function SettingsPage({
     (profile.subscription_status ?? 'free') as SubscriptionStatus,
   );
 
+  const dict = getDictionary(await getLocale());
+  const t = (k: string) => translate(dict, k);
+
   const initial: ProfileUpdateInput = {
     nome: profile.nome ?? '',
     tema: profile.tema ?? [],
@@ -60,11 +65,8 @@ export default async function SettingsPage({
       <div className="flex items-start justify-between gap-4">
         <div className="space-y-1">
           <p className="text-sm text-[var(--color-muted)]">{user.email}</p>
-          <h1 className="text-3xl font-semibold tracking-tight">Seu perfil</h1>
-          <p className="text-sm text-[var(--color-muted)]">
-            Edite o que quiser e clique em salvar. A curadoria considera essas configurações
-            no próximo envio.
-          </p>
+          <h1 className="text-3xl font-semibold tracking-tight">{t('settings.title')}</h1>
+          <p className="text-sm text-[var(--color-muted)]">{t('settings.subtitle')}</p>
         </div>
         <div className="flex shrink-0 items-center gap-2">
           {isAdmin && (
@@ -72,7 +74,7 @@ export default async function SettingsPage({
               href="/admin"
               className="rounded-md border border-[var(--color-fg)] bg-[var(--color-fg)] px-4 py-2 text-sm text-white transition hover:opacity-90"
             >
-              Admin
+              {t('settings.admin')}
             </Link>
           )}
           <form action={signOut}>
@@ -80,7 +82,7 @@ export default async function SettingsPage({
               type="submit"
               className="rounded-md border border-[var(--color-border)] bg-white px-4 py-2 text-sm hover:border-[var(--color-fg)]"
             >
-              Sair
+              {t('settings.signOut')}
             </button>
           </form>
         </div>
@@ -88,9 +90,7 @@ export default async function SettingsPage({
 
       {welcome && (
         <div className="rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
-          {gate.allowed
-            ? '✓ Perfil salvo! O primeiro email vai chegar na frequência que você escolheu — ou clique abaixo pra receber um exemplo agora.'
-            : '✓ Perfil salvo! Comece seu mês grátis abaixo pra ativar a curadoria — o primeiro email chega na frequência que você escolheu.'}
+          {gate.allowed ? t('settings.welcomeAllowed') : t('settings.welcomeFree')}
         </div>
       )}
 

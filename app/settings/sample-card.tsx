@@ -4,6 +4,7 @@ import { useEffect, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { sendSampleNow, type SampleResult } from './actions';
 import { SAMPLE_COOLDOWN_MS } from './constants';
+import { useT } from '../_i18n/provider';
 
 interface Props {
   userEmail: string;
@@ -22,6 +23,7 @@ function formatRemaining(ms: number): string {
 
 export function SampleCard({ userEmail, lastDeliveredAt }: Props) {
   const router = useRouter();
+  const t = useT();
   const [pending, startTransition] = useTransition();
   const [result, setResult] = useState<SampleResult | null>(null);
   const [now, setNow] = useState<number>(() => Date.now());
@@ -48,20 +50,19 @@ export function SampleCard({ userEmail, lastDeliveredAt }: Props) {
   }
 
   const buttonLabel = pending
-    ? 'Gerando…'
+    ? t('sample.generating')
     : onCooldown
-      ? `Aguarde ${formatRemaining(cooldownRemaining)}`
-      : 'Enviar agora';
+      ? t('sample.wait', { time: formatRemaining(cooldownRemaining) })
+      : t('sample.send');
 
   return (
     <div className="space-y-4">
       <div className="rounded-lg border border-[var(--color-border)] bg-white p-5">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div className="space-y-1">
-            <p className="text-sm font-medium">Receber um email de exemplo agora</p>
+            <p className="text-sm font-medium">{t('sample.title')}</p>
             <p className="text-xs text-[var(--color-muted)] max-w-md">
-              Pra ver como o produto entrega antes do horário agendado. A geração + envio leva
-              ~1-2 minutos. Vai pro {userEmail}. Limite de 1 envio a cada 5 minutos.
+              {t('sample.body', { email: userEmail })}
               {IS_DEV && ' (Em dev, o preview aparece abaixo após gerar.)'}
             </p>
           </div>
@@ -76,15 +77,13 @@ export function SampleCard({ userEmail, lastDeliveredAt }: Props) {
         </div>
 
         {pending && (
-          <p className="mt-3 text-xs text-[var(--color-muted)]">
-            ✨ Buscando conteúdo na web, gerando o email e enviando. Não saia da página.
-          </p>
+          <p className="mt-3 text-xs text-[var(--color-muted)]">{t('sample.working')}</p>
         )}
 
         {result?.ok && (
           <div className="mt-3 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
-            ✓ Email enviado{result.itemsCount ? ` com ${result.itemsCount} item(s)` : ''}.
-            {IS_DEV ? ' Preview abaixo.' : ' Cheque seu inbox (e a pasta de spam na primeira vez).'}
+            {t('sample.sentOk')}
+            {IS_DEV ? ' Preview abaixo.' : ''}
           </div>
         )}
 

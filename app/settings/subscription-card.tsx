@@ -7,10 +7,12 @@ import {
   createPortalSession,
   redeemCompCode,
 } from './subscription-actions';
+import { useT, useLocale } from '../_i18n/provider';
+import { INTL_LOCALE } from '@/src/lib/i18n';
 import type { GateResult } from '@/src/lib/subscription';
 
 interface Props {
-  /** Estado do gating (subscribed / free / past_due / canceled). */
+  /** Estado do gating (subscribed / manual / free / past_due / canceled). */
   gateState: GateResult['state'];
   plan: 'mensal' | 'anual' | null;
   currentPeriodEnd: string | null;
@@ -19,13 +21,6 @@ interface Props {
   /** Fim do período de teste (ISO). Se no futuro, está em trial. */
   trialEnd?: string | null;
   justSubscribed?: boolean;
-}
-
-const PRICE_MENSAL = 'R$ 19,90/mês';
-const PRICE_ANUAL = 'R$ 199/ano';
-
-function fmtDate(iso: string): string {
-  return new Date(iso).toLocaleDateString('pt-BR', { dateStyle: 'long' });
 }
 
 export function SubscriptionCard({
@@ -37,10 +32,17 @@ export function SubscriptionCard({
   justSubscribed,
 }: Props) {
   const router = useRouter();
+  const t = useT();
+  const locale = useLocale();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [showCoupon, setShowCoupon] = useState(false);
   const [coupon, setCoupon] = useState('');
+
+  const priceMonthly = t('sub.priceMonthly');
+  const priceAnnual = t('sub.priceAnnual');
+  const fmtDate = (iso: string) =>
+    new Date(iso).toLocaleDateString(INTL_LOCALE[locale], { dateStyle: 'long' });
 
   function goCheckout(p: 'mensal' | 'anual') {
     setError(null);
@@ -76,17 +78,16 @@ export function SubscriptionCard({
 
   // --- Assinante ativo (inclui trial e "cancelado mas vigente") ---
   if (gateState === 'subscribed') {
-    const planLabel = plan === 'anual' ? 'Anual' : 'Mensal';
+    const planLabel = plan === 'anual' ? t('sub.planAnnual') : t('sub.planMonthly');
+    const planPrice = plan === 'anual' ? priceAnnual : priceMonthly;
     const isTrial = !!trialEnd && new Date(trialEnd).getTime() > Date.now();
     const canceling = !!cancelAtPeriodEnd;
-    // Durante o trial, current_period_end == trial_end (data da 1ª cobrança).
     const periodDate = currentPeriodEnd
       ? fmtDate(currentPeriodEnd)
       : trialEnd
         ? fmtDate(trialEnd)
         : null;
 
-    // Cor: âmbar se cancelando; azul se em trial; verde se pago ativo.
     const tone = canceling
       ? { border: 'border-amber-300', bg: 'bg-amber-50', title: 'text-amber-900', sub: 'text-amber-700', btn: 'border-amber-300 text-amber-800 hover:border-amber-500' }
       : isTrial
@@ -96,30 +97,24 @@ export function SubscriptionCard({
     let title: string;
     let subline: string | null = null;
     if (canceling && isTrial) {
-      title = `Teste grátis — plano ${planLabel} (cancelamento agendado)`;
-      subline = periodDate
-        ? `Acesso até ${periodDate}. Você não será cobrado. Reative antes pra continuar.`
-        : null;
+      title = t('sub.titleTrialCanceling', { plan: planLabel });
+      subline = periodDate ? t('sub.lineTrialCanceling', { date: periodDate }) : null;
     } else if (canceling) {
-      title = `Plano ${planLabel} ativo (cancelamento agendado)`;
-      subline = periodDate
-        ? `Acesso até ${periodDate}. Depois não renova — você pode reativar a qualquer momento antes.`
-        : null;
+      title = t('sub.titleCanceling', { plan: planLabel });
+      subline = periodDate ? t('sub.lineCanceling', { date: periodDate }) : null;
     } else if (isTrial) {
-      title = `Teste grátis ativo — plano ${planLabel}`;
-      subline = periodDate
-        ? `Grátis até ${periodDate}. A primeira cobrança (${planLabel === 'Anual' ? PRICE_ANUAL : PRICE_MENSAL}) acontece nessa data. Cancele antes e não paga nada.`
-        : null;
+      title = t('sub.titleTrial', { plan: planLabel });
+      subline = periodDate ? t('sub.lineTrial', { date: periodDate, price: planPrice }) : null;
     } else {
-      title = `Plano ${planLabel} ativo`;
-      subline = periodDate ? `Renova em ${periodDate}.` : null;
+      title = t('sub.titleActive', { plan: planLabel });
+      subline = periodDate ? t('sub.lineActive', { date: periodDate }) : null;
     }
 
     return (
       <div className={`rounded-lg border p-5 ${tone.border} ${tone.bg}`}>
         {justSubscribed && (
           <p className={`mb-2 text-sm font-medium ${tone.title}`}>
-            {isTrial ? '🎉 Mês grátis ativado!' : '🎉 Assinatura confirmada!'}
+            {isTrial ? t('sub.trialActivated') : t('sub.confirmed')}
           </p>
         )}
         <p className={`text-sm font-medium ${tone.title}`}>{title}</p>
@@ -130,7 +125,7 @@ export function SubscriptionCard({
           disabled={pending}
           className={`mt-3 rounded-md border bg-white px-4 py-2 text-sm transition disabled:opacity-50 ${tone.btn}`}
         >
-          {pending ? 'Abrindo…' : canceling ? 'Reativar / gerenciar' : 'Gerenciar assinatura'}
+          {pending ? t('sub.opening') : canceling ? t('sub.reactivate') : t('sub.manage')}
         </button>
         {error && <p className="mt-2 text-sm text-red-700">{error}</p>}
       </div>
@@ -141,11 +136,8 @@ export function SubscriptionCard({
   if (gateState === 'manual') {
     return (
       <div className="rounded-lg border border-emerald-300 bg-emerald-50 p-5">
-        <p className="text-sm font-medium text-emerald-900">Acesso de cortesia ativo 🎁</p>
-        <p className="mt-1 text-xs text-emerald-700">
-          Você está no beta com acesso liberado — sem cobrança. Recebe sua curadoria
-          normalmente na frequência escolhida.
-        </p>
+        <p className="text-sm font-medium text-emerald-900">{t('sub.manualTitle')}</p>
+        <p className="mt-1 text-xs text-emerald-700">{t('sub.manualBody')}</p>
       </div>
     );
   }
@@ -154,17 +146,15 @@ export function SubscriptionCard({
   if (gateState === 'past_due') {
     return (
       <div className="rounded-lg border border-[var(--color-border)] bg-white p-5">
-        <p className="text-sm font-medium">⚠️ Pagamento pendente</p>
-        <p className="mt-1 text-xs text-[var(--color-muted)]">
-          Não conseguimos cobrar sua assinatura. Atualize o pagamento pra continuar recebendo.
-        </p>
+        <p className="text-sm font-medium">{t('sub.pastDueTitle')}</p>
+        <p className="mt-1 text-xs text-[var(--color-muted)]">{t('sub.pastDueBody')}</p>
         <button
           type="button"
           onClick={goPortal}
           disabled={pending}
           className="mt-3 rounded-md bg-[var(--color-fg)] px-4 py-2 text-sm text-white transition hover:opacity-90 disabled:opacity-50"
         >
-          {pending ? 'Abrindo…' : 'Atualizar pagamento'}
+          {pending ? t('sub.opening') : t('sub.updatePayment')}
         </button>
         {error && <p className="mt-2 text-sm text-red-700">{error}</p>}
       </div>
@@ -172,14 +162,8 @@ export function SubscriptionCard({
   }
 
   // --- Free (nunca assinou) ou canceled → mostra planos com mês grátis ---
-  const headline =
-    gateState === 'canceled'
-      ? 'Sua assinatura foi cancelada'
-      : 'Comece com 30 dias grátis';
-  const subtitle =
-    gateState === 'canceled'
-      ? 'Reative quando quiser pra voltar a receber sua curadoria.'
-      : 'Escolha um plano. Você só é cobrado depois de 30 dias e pode cancelar quando quiser — sem cobrança se cancelar antes.';
+  const headline = gateState === 'canceled' ? t('sub.canceledHeadline') : t('sub.startHeadline');
+  const subtitle = gateState === 'canceled' ? t('sub.canceledSub') : t('sub.startSub');
 
   return (
     <div className="rounded-lg border border-[var(--color-border)] bg-white p-5">
@@ -193,8 +177,8 @@ export function SubscriptionCard({
           disabled={pending}
           className="flex-1 rounded-md border border-[var(--color-border)] bg-white px-4 py-3 text-sm transition hover:border-[var(--color-fg)] disabled:opacity-50"
         >
-          <span className="block font-medium">Mensal</span>
-          <span className="text-xs text-[var(--color-muted)]">{PRICE_MENSAL} · 30 dias grátis</span>
+          <span className="block font-medium">{t('sub.planMonthly')}</span>
+          <span className="text-xs text-[var(--color-muted)]">{t('sub.btnSubTrial', { price: priceMonthly })}</span>
         </button>
         <button
           type="button"
@@ -202,8 +186,8 @@ export function SubscriptionCard({
           disabled={pending}
           className="flex-1 rounded-md border-2 border-[var(--color-fg)] bg-[var(--color-fg)] px-4 py-3 text-sm text-white transition hover:opacity-90 disabled:opacity-50"
         >
-          <span className="block font-medium">Anual · 2 meses grátis</span>
-          <span className="text-xs opacity-80">{PRICE_ANUAL} · 30 dias grátis</span>
+          <span className="block font-medium">{t('sub.btnAnnual')}</span>
+          <span className="text-xs opacity-80">{t('sub.btnSubTrial', { price: priceAnnual })}</span>
         </button>
       </div>
 
@@ -218,7 +202,7 @@ export function SubscriptionCard({
             }}
             className="text-xs text-[var(--color-muted)] underline hover:text-[var(--color-fg)]"
           >
-            Tenho um cupom de cortesia
+            {t('sub.haveCoupon')}
           </button>
         ) : (
           <div className="flex flex-col gap-2 sm:flex-row">
@@ -226,7 +210,7 @@ export function SubscriptionCard({
               type="text"
               value={coupon}
               onChange={(e) => setCoupon(e.target.value)}
-              placeholder="Digite seu cupom"
+              placeholder={t('sub.couponPlaceholder')}
               autoCapitalize="characters"
               className="flex-1 rounded-md border border-[var(--color-border)] px-3 py-2 text-sm uppercase placeholder:normal-case placeholder:text-[var(--color-muted)] focus:border-[var(--color-fg)] focus:outline-none"
               onKeyDown={(e) => {
@@ -239,7 +223,7 @@ export function SubscriptionCard({
               disabled={pending || !coupon.trim()}
               className="rounded-md border border-[var(--color-fg)] bg-white px-4 py-2 text-sm transition hover:bg-[var(--color-fg)] hover:text-white disabled:opacity-50"
             >
-              {pending ? 'Resgatando…' : 'Resgatar'}
+              {pending ? t('sub.redeeming') : t('sub.redeem')}
             </button>
           </div>
         )}

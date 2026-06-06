@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { getQuestions, isQuestionShown, type QuestionId } from '@/app/onboarding/questions';
 import { StepCard } from '@/app/onboarding/step-card';
-import { useLocale } from '@/app/_i18n/provider';
+import { useLocale, useT } from '@/app/_i18n/provider';
 import { updateProfile, setActive, type ProfileUpdateInput } from './actions';
 
 interface Props {
@@ -17,6 +17,7 @@ type Feedback = { kind: 'saved'; text?: string } | { kind: 'error'; text: string
 
 export function SettingsForm({ initial, isActive: initialActive }: Props) {
   const router = useRouter();
+  const t = useT();
   const locale = useLocale();
   const questions = getQuestions(locale);
   const [values, setValues] = useState<ProfileUpdateInput>(initial);
@@ -74,12 +75,10 @@ export function SettingsForm({ initial, isActive: initialActive }: Props) {
       <div className="flex items-center justify-between gap-4 rounded-lg border border-[var(--color-border)] bg-white p-5">
         <div>
           <p className="text-sm font-medium">
-            {active ? 'Recebendo emails' : 'Entregas pausadas'}
+            {active ? t('settings.statusOn') : t('settings.statusOff')}
           </p>
           <p className="text-xs text-[var(--color-muted)]">
-            {active
-              ? 'Os emails seguem sua frequência configurada.'
-              : 'Você não receberá novos emails até reativar.'}
+            {active ? t('settings.statusOnDesc') : t('settings.statusOffDesc')}
           </p>
         </div>
         <button
@@ -93,7 +92,7 @@ export function SettingsForm({ initial, isActive: initialActive }: Props) {
               : 'bg-[var(--color-accent)] text-[var(--color-accent-fg)] hover:opacity-90',
           )}
         >
-          {active ? 'Pausar' : 'Reativar'}
+          {active ? t('settings.pause') : t('settings.resume')}
         </button>
       </div>
 
@@ -116,16 +115,16 @@ export function SettingsForm({ initial, isActive: initialActive }: Props) {
       <div className="sticky bottom-4 z-10 flex flex-col gap-3 rounded-lg border border-[var(--color-border)] bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
         <div className="text-sm">
           {feedback?.kind === 'saved' && (
-            <span className="text-emerald-700">✓ Salvo!</span>
+            <span className="text-emerald-700">{t('settings.saved')}</span>
           )}
           {feedback?.kind === 'error' && (
             <span className="text-red-700">{feedback.text}</span>
           )}
           {!feedback && isDirty && (
-            <span className="text-[var(--color-muted)]">Alterações não salvas</span>
+            <span className="text-[var(--color-muted)]">{t('settings.unsaved')}</span>
           )}
           {!feedback && !isDirty && (
-            <span className="text-[var(--color-muted)]">Sem alterações</span>
+            <span className="text-[var(--color-muted)]">{t('settings.noChanges')}</span>
           )}
         </div>
         <div className="flex gap-2">
@@ -135,7 +134,7 @@ export function SettingsForm({ initial, isActive: initialActive }: Props) {
             disabled={!isDirty || pending}
             className="rounded-md border border-[var(--color-border)] bg-white px-4 py-2 text-sm transition hover:border-[var(--color-fg)] disabled:opacity-40"
           >
-            Descartar
+            {t('settings.discard')}
           </button>
           <button
             type="button"
@@ -143,7 +142,7 @@ export function SettingsForm({ initial, isActive: initialActive }: Props) {
             disabled={!isDirty || pending}
             className="rounded-md bg-[var(--color-accent)] px-6 py-2 text-sm font-medium text-[var(--color-accent-fg)] transition hover:opacity-90 disabled:opacity-40"
           >
-            {pending ? 'Salvando…' : 'Salvar alterações'}
+            {pending ? t('settings.saving') : t('settings.save')}
           </button>
         </div>
       </div>

@@ -63,3 +63,10 @@ export const LOCALE_LABEL: Record<Locale, string> = {
   en: 'English',
   es: 'Español',
 };
+
+/** Locale BCP-47 pra Intl (datas/números). */
+export const INTL_LOCALE: Record<Locale, string> = {
+  pt: 'pt-BR',
+  en: 'en-US',
+  es: 'es-ES',
+};

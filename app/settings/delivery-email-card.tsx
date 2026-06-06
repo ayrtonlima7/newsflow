@@ -3,6 +3,7 @@
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { requestDeliveryEmailChange, confirmDeliveryEmail } from './actions';
+import { useT } from '../_i18n/provider';
 
 interface Props {
   /** Email da conta (auth) — usado quando não há email de entrega definido. */
@@ -13,6 +14,7 @@ interface Props {
 
 export function DeliveryEmailCard({ authEmail, deliveryEmail }: Props) {
   const router = useRouter();
+  const t = useT();
   const [step, setStep] = useState<'input' | 'code'>('input');
   const [value, setValue] = useState(deliveryEmail ?? '');
   const [pendingEmail, setPendingEmail] = useState('');
@@ -29,7 +31,7 @@ export function DeliveryEmailCard({ authEmail, deliveryEmail }: Props) {
     startTransition(async () => {
       const res = await requestDeliveryEmailChange(value);
       if (res.status === 'cleared') {
-        setFeedback({ ok: true, text: '✓ Voltou a usar o email da conta.' });
+        setFeedback({ ok: true, text: t('demail.cleared') });
         router.refresh();
       } else if (res.status === 'code_sent') {
         setPendingEmail(res.email);
@@ -47,7 +49,7 @@ export function DeliveryEmailCard({ authEmail, deliveryEmail }: Props) {
       const res = await confirmDeliveryEmail(code);
       if (res.ok) {
         setStep('input');
-        setFeedback({ ok: true, text: '✓ Email de entrega confirmado!' });
+        setFeedback({ ok: true, text: t('demail.confirmed') });
         router.refresh();
       } else {
         setFeedback({ ok: false, text: res.error ?? 'erro ao confirmar' });
@@ -64,15 +66,12 @@ export function DeliveryEmailCard({ authEmail, deliveryEmail }: Props) {
 
   return (
     <div className="rounded-lg border border-[var(--color-border)] bg-white p-5">
-      <p className="text-sm font-medium">Email de entrega</p>
+      <p className="text-sm font-medium">{t('demail.title')}</p>
 
       {step === 'input' ? (
         <>
           <p className="mt-1 text-xs text-[var(--color-muted)]">
-            Sua curadoria é enviada para{' '}
-            <span className="font-medium text-[var(--color-fg)]">{current}</span>
-            {usingAccount ? ' (email da sua conta).' : '.'} Quer receber em outro endereço?
-            A gente manda um código pra confirmar. Deixe vazio para usar o email da conta.
+            {t(usingAccount ? 'demail.leadAccount' : 'demail.leadCustom', { current })}
           </p>
 
           <div className="mt-3 flex flex-col gap-2 sm:flex-row">
@@ -95,16 +94,14 @@ export function DeliveryEmailCard({ authEmail, deliveryEmail }: Props) {
               disabled={pending || !dirty}
               className="rounded-md bg-[var(--color-fg)] px-4 py-2 text-sm text-white transition hover:opacity-90 disabled:opacity-40"
             >
-              {pending ? 'Enviando…' : value.trim() ? 'Verificar' : 'Salvar'}
+              {pending ? t('demail.sending') : value.trim() ? t('demail.verify') : t('demail.save')}
             </button>
           </div>
         </>
       ) : (
         <>
           <p className="mt-1 text-xs text-[var(--color-muted)]">
-            Enviamos um código de 6 dígitos para{' '}
-            <span className="font-medium text-[var(--color-fg)]">{pendingEmail}</span>. Digite
-            abaixo pra confirmar. (Cheque o spam se não chegar.)
+            {t('demail.codeSent', { email: pendingEmail })}
           </p>
 
           <div className="mt-3 flex flex-col gap-2 sm:flex-row">
@@ -130,7 +127,7 @@ export function DeliveryEmailCard({ authEmail, deliveryEmail }: Props) {
               disabled={pending || code.length !== 6}
               className="rounded-md bg-[var(--color-fg)] px-4 py-2 text-sm text-white transition hover:opacity-90 disabled:opacity-40"
             >
-              {pending ? 'Confirmando…' : 'Confirmar'}
+              {pending ? t('demail.confirming') : t('demail.confirm')}
             </button>
           </div>
 
@@ -140,7 +137,7 @@ export function DeliveryEmailCard({ authEmail, deliveryEmail }: Props) {
             disabled={pending}
             className="mt-2 text-xs text-[var(--color-muted)] underline hover:text-[var(--color-fg)] disabled:opacity-50"
           >
-            Cancelar
+            {t('demail.cancel')}
           </button>
         </>
       )}

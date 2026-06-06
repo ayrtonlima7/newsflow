@@ -25,7 +25,13 @@ export async function generateTopicSuggestions(
   }
 
   try {
-    const provider = await getProvider();
+    // Provider explícito (mesmo padrão de curate/normalize) — NÃO usar getProvider()
+    // sem arg, que cai no default 'gemini' (dormente) se LLM_PROVIDER faltar.
+    const provider = await getProvider(
+      process.env.NORMALIZE_LLM_PROVIDER ??
+        process.env.EMAIL_LLM_PROVIDER ??
+        process.env.LLM_PROVIDER,
+    );
     const system =
       'Você ajuda usuários a configurar uma curadoria de conteúdo personalizada. ' +
       'Você gera sugestões de tópicos, ferramentas, marcas e conceitos específicos relevantes ' +

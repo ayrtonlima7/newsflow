@@ -40,6 +40,10 @@ export interface TavilySearchOptions {
   maxResults?: number;
   /** "news" (com published_date) ou "general". Default: news. */
   topic?: 'news' | 'general';
+  /** Restringe a busca a estes domínios. Usado pra enviesar por país/idioma
+   *  (ex: domínios brasileiros pra usuários pt) — o índice news da Tavily é
+   *  global/inglês por padrão e devolve lixo pra temas locais. */
+  includeDomains?: string[];
 }
 
 /** Normaliza published_date da Tavily (pode vir ISO completo) pra YYYY-MM-DD. */
@@ -60,7 +64,7 @@ export async function tavilySearch(
     return [];
   }
 
-  const { days = 7, maxResults = 8, topic = 'news' } = opts;
+  const { days = 7, maxResults = 8, topic = 'news', includeDomains } = opts;
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), SEARCH_TIMEOUT_MS);
@@ -76,6 +80,7 @@ export async function tavilySearch(
     };
     // `days` só é válido pra topic=news
     if (topic === 'news') body.days = days;
+    if (includeDomains && includeDomains.length > 0) body.include_domains = includeDomains;
 
     const res = await fetch(TAVILY_ENDPOINT, {
       method: 'POST',

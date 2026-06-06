@@ -147,8 +147,8 @@ const pt: Dictionary = {
   'demail.confirmed': '✓ Email de entrega confirmado!',
 
   // amostra
-  'sample.title': 'Receber um email de exemplo agora',
-  'sample.body': 'Pra ver como o produto entrega antes do horário agendado. A geração + envio leva ~1-2 minutos. Vai pro {email}. Limite de 1 envio a cada 5 minutos.',
+  'sample.title': 'Antecipar minha próxima curadoria',
+  'sample.body': 'Manda sua próxima edição agora, em vez de esperar o horário. Vai pro {email} e conta como a curadoria do período — você não recebe duplicado depois. Geração + envio leva ~1-2 minutos; limite de 1 a cada 5 minutos.',
   'sample.send': 'Enviar agora',
   'sample.generating': 'Gerando…',
   'sample.wait': 'Aguarde {time}',
@@ -281,8 +281,8 @@ const en: Dictionary = {
   'demail.cleared': '✓ Back to using your account email.',
   'demail.confirmed': '✓ Delivery email confirmed!',
 
-  'sample.title': 'Get a sample email now',
-  'sample.body': 'To see how the product delivers before the scheduled time. Generating + sending takes ~1-2 minutes. Goes to {email}. Limit of 1 send every 5 minutes.',
+  'sample.title': 'Send my next briefing now',
+  'sample.body': "Sends your next edition right away instead of waiting for the scheduled time. Goes to {email} and counts as this period's briefing — no duplicate later. Generating + sending takes ~1-2 minutes; limit of 1 every 5 minutes.",
   'sample.send': 'Send now',
   'sample.generating': 'Generating…',
   'sample.wait': 'Wait {time}',
@@ -415,8 +415,8 @@ const es: Dictionary = {
   'demail.cleared': '✓ Volviste a usar el email de la cuenta.',
   'demail.confirmed': '✓ ¡Email de entrega confirmado!',
 
-  'sample.title': 'Recibir un email de ejemplo ahora',
-  'sample.body': 'Para ver cómo entrega el producto antes de la hora programada. Generar + enviar toma ~1-2 minutos. Va a {email}. Límite de 1 envío cada 5 minutos.',
+  'sample.title': 'Adelantar mi próxima curaduría',
+  'sample.body': 'Envía tu próxima edición ahora, en vez de esperar la hora. Va a {email} y cuenta como la curaduría del período — no recibes duplicado después. Generar + enviar toma ~1-2 minutos; límite de 1 cada 5 minutos.',
   'sample.send': 'Enviar ahora',
   'sample.generating': 'Generando…',
   'sample.wait': 'Espera {time}',

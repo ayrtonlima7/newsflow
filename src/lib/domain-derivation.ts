@@ -1,6 +1,7 @@
 import OpenAI from 'openai';
 import type { Profile } from './types';
 import { normalizeLocale } from './i18n';
+import { extractJson } from './providers';
 
 /** Catálogo completo de domínios brasileiros de qualidade, organizado por
  *  vertical. Usado pelo prompt de derivação pra o LLM escolher um subconjunto
@@ -130,29 +131,36 @@ export async function deriveDomains(profile: Profile): Promise<string[] | null> 
       // prompt é suficiente pro reasoning model.
     });
 
-    // R1 pode devolver conteúdo em reasoning_content em vez de content.
+    // R1 sem response_format: content = resposta final, reasoning_content = CoT.
+    // Só usamos content. Se content vier vazio, o modelo não gerou resposta final
+    // (possível com reasoning models truncados).
     const msg = response.choices[0]?.message as {
       content?: string;
       reasoning_content?: string;
     };
-    const text = (msg?.content?.trim() || msg?.reasoning_content?.trim()) ?? '';
-    if (!text) {
-      console.warn('[deriveDomains] resposta vazia do modelo — usando lista estática');
+    const rawContent = msg?.content?.trim() ?? '';
+    if (!rawContent) {
+      console.warn(
+        '[deriveDomains] content vazio' +
+          (msg?.reasoning_content
+            ? ` (reasoning_content tem ${msg.reasoning_content.length} chars — ignorado)`
+            : ''),
+        ' — usando lista estática',
+      );
       return null;
     }
 
-    // Extrai JSON (pode vir com fences markdown mesmo com jsonMode)
-    let parsed: unknown;
+    // extractJson do próprio codebase: lida com fences markdown, texto antes/depois
+    // do JSON, e brace-matching com escape de string.
+    let parsed: { domains?: unknown };
     try {
-      parsed = JSON.parse(text);
-    } catch {
-      // Tenta extrair de fences
-      const match = text.match(/\{[\s\S]*\}/);
-      if (!match) {
-        console.warn('[deriveDomains] resposta sem JSON válido — usando lista estática');
-        return null;
-      }
-      parsed = JSON.parse(match[0]);
+      parsed = extractJson<{ domains?: unknown }>(rawContent);
+    } catch (err) {
+      console.warn(
+        `[deriveDomains] JSON inválido na resposta (${rawContent.length} chars):`,
+        rawContent.slice(0, 300),
+      );
+      return null;
     }
 
     const obj = parsed as Record<string, unknown>;

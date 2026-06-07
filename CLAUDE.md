@@ -97,11 +97,13 @@ On profile save (onboarding + settings), `deriveDomains(profile)` calls **DeepSe
 
 - **Runs 1× per profile save**, not per delivery. Runs in parallel with `normalizeTopics()` via `Promise.all`.
 - **Target ~50 domains** (catalog has 35; the LLM can include domains outside the catalog — logged as warnings but kept). No minimum floor.
-- **Fail-open**: returns `null` on any error (missing key, timeout, bad response). The pipeline falls back to the static `DOMAINS_BY_LOCALE['pt']`.
+- **Robust to model swap**: tries `DERIVE_DOMAINS_MODEL` first, then auto-falls-back to **`deepseek-chat`** if that model returns empty `content` or errors (`resolveDeriveModels()` builds the ordered list, no-dup when they're equal). A model that returns empty no longer silently kills the feature — it recovers before giving up to the static list.
+- **JSON mode is model-aware** (`isReasonerModel()`): non-reasoner models (`deepseek-chat`, `deepseek-v4-flash/pro`) get `response_format: json_object` for a predictable reply; reasoners (`deepseek-reasoner`/R1) do **not** (they don't support it — the answer would go to `reasoning_content` and leave `content` empty), relying on the prompt's "JSON only" instruction + `extractJson`. ⚠️ The old code dropped `response_format` for *all* models, which is why `deepseek-v4-flash` returned empty `content` and fell to the static list.
+- **Fail-open**: returns `null` only when *no* model produces a usable list (missing key, all models empty/errored). The pipeline falls back to the static `DOMAINS_BY_LOCALE['pt']`.
 - **pt-only**: en/es return `null` immediately (no domain restriction).
 - **Consumed by** `resolveDomains()` in `pipeline.ts`: `profile.dominios_busca` → static list → `undefined`.
 - **Standalone client**: creates its own OpenAI client pointing to DeepSeek (same `DEEPSEEK_API_KEY`, different model). Does NOT use `getProvider()` — keeps the model override isolated.
-- **Env var**: `DERIVE_DOMAINS_MODEL` (default `deepseek-reasoner`). Set in `.env.local` (production) — not in `.env.example` as active, only documented.
+- **Env var**: `DERIVE_DOMAINS_MODEL` (default `deepseek-reasoner`; `deepseek-chat` and `deepseek-v4-flash` also work). Set in Vercel env (production) — not in `.env.example` as active, only documented.
 - **Migration**: `0013_dominios_busca.sql` adds the `dominios_busca text[]` column + backfills with the static list for existing pt profiles.
 
 ### Cron / scheduling

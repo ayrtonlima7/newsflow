@@ -36,6 +36,22 @@ const ALL_CATALOG_DOMAINS = new Set(
   Object.values(DOMAIN_CATALOG).flat(),
 );
 
+/** Modelo de fallback confiável. deepseek-chat sempre popula `content` e suporta
+ *  JSON mode — usado quando o modelo configurado volta vazio ou dá erro. */
+const FALLBACK_MODEL = 'deepseek-chat';
+
+/** Heurística: o modelo é de raciocínio (R1)? Reasoners NÃO suportam
+ *  response_format json_object e mandam a resposta pro reasoning_content. */
+export function isReasonerModel(model: string): boolean {
+  return /reasoner|r1/i.test(model);
+}
+
+/** Ordena os modelos a tentar: o configurado primeiro, depois o fallback
+ *  confiável (se for diferente). Sem duplicar quando já são iguais. */
+export function resolveDeriveModels(primary: string): string[] {
+  return primary === FALLBACK_MODEL ? [primary] : [primary, FALLBACK_MODEL];
+}
+
 function buildDeriveDomainsPrompt(profile: Profile): { system: string; user: string } {
   const tema = profile.tema?.join(', ') || 'não informado';
   const contexto = profile.contexto?.join(', ') || 'não informado';
@@ -92,15 +108,103 @@ function buildDeriveDomainsPrompt(profile: Profile): { system: string; user: str
 }
 
 /**
- * Deriva uma lista de domínios brasileiros relevantes pro perfil usando um LLM
- * forte (DeepSeek reasoning). Chamada 1× por save de perfil (onboarding/settings).
+ * Faz UMA chamada de derivação com um modelo específico e parseia a resposta.
+ * Retorna o array de domínios (não-vazio) ou null se o modelo não produziu uma
+ * resposta utilizável (content vazio, JSON inválido, sem array, zero domínios).
+ * Lança em erro de API (modelo inválido, rede) — o chamador decide o fallback.
+ */
+async function tryDeriveWithModel(
+  client: OpenAI,
+  model: string,
+  system: string,
+  user: string,
+): Promise<string[] | null> {
+  const params: OpenAI.Chat.Completions.ChatCompletionCreateParamsNonStreaming = {
+    model,
+    messages: [
+      { role: 'system', content: system },
+      { role: 'user', content: user },
+    ],
+    max_tokens: 1024,
+    // Modelos não-reasoner suportam response_format json_object → resposta mais
+    // previsível. deepseek-reasoner (R1) NÃO suporta (ignora e manda tudo pro
+    // reasoning_content, deixando content vazio) — nesse caso confiamos na
+    // instrução "Responda APENAS com JSON" do prompt + extractJson.
+    ...(isReasonerModel(model)
+      ? {}
+      : { response_format: { type: 'json_object' as const } }),
+  };
+
+  const response = await client.chat.completions.create(params);
+
+  const msg = response.choices[0]?.message as {
+    content?: string;
+    reasoning_content?: string;
+  };
+  const rawContent = msg?.content?.trim() ?? '';
+  if (!rawContent) {
+    console.warn(
+      `[deriveDomains] content vazio (modelo ${model})` +
+        (msg?.reasoning_content
+          ? ` (reasoning_content tem ${msg.reasoning_content.length} chars — ignorado)`
+          : ''),
+    );
+    return null;
+  }
+
+  // extractJson do próprio codebase: lida com fences markdown, texto antes/depois
+  // do JSON, e brace-matching com escape de string.
+  let parsed: { domains?: unknown };
+  try {
+    parsed = extractJson<{ domains?: unknown }>(rawContent);
+  } catch {
+    console.warn(
+      `[deriveDomains] JSON inválido (modelo ${model}, ${rawContent.length} chars):`,
+      rawContent.slice(0, 300),
+    );
+    return null;
+  }
+
+  const obj = parsed as Record<string, unknown>;
+  if (!Array.isArray(obj.domains)) {
+    console.warn(`[deriveDomains] resposta sem array "domains" (modelo ${model})`);
+    return null;
+  }
+
+  const domains = obj.domains.filter(
+    (d: unknown): d is string => typeof d === 'string' && d.trim().length > 0,
+  );
+
+  // Loga domínios fora do catálogo (não descarta — o LLM pode conhecer
+  // fontes boas que ainda não catalogamos).
+  for (const d of domains) {
+    if (!ALL_CATALOG_DOMAINS.has(d)) {
+      console.warn(`[deriveDomains] domínio fora do catálogo: "${d}" — mantendo mesmo assim`);
+    }
+  }
+
+  const usage = response.usage;
+  console.log(
+    `[deriveDomains] ${domains.length} domínios derivados (modelo ${model}) | ` +
+      `in=${usage?.prompt_tokens ?? '?'} out=${usage?.completion_tokens ?? '?'} tok`,
+  );
+
+  return domains.length > 0 ? domains : null;
+}
+
+/**
+ * Deriva uma lista de domínios brasileiros relevantes pro perfil usando um LLM.
+ * Chamada 1× por save de perfil (onboarding/settings).
  *
- * Retorna null se:
+ * Robusto a troca de modelo: tenta o `DERIVE_DOMAINS_MODEL` configurado e, se ele
+ * voltar vazio ou der erro, cai automaticamente pro `deepseek-chat` antes de
+ * desistir. Assim um swap experimental (ex: um modelo que não popula `content`)
+ * não mata a feature silenciosamente.
+ *
+ * Retorna null (→ consumidor usa a lista estática) se:
  * - O locale não for pt (en/es não usam restrição de domínio)
  * - A chave de API não estiver configurada
- * - Qualquer erro ocorrer na chamada ou parsing
- *
- * O consumidor trata null como "use a lista estática".
+ * - NENHUM dos modelos produzir uma lista utilizável
  */
 export async function deriveDomains(profile: Profile): Promise<string[] | null> {
   const locale = normalizeLocale(profile.idioma);
@@ -112,84 +216,34 @@ export async function deriveDomains(profile: Profile): Promise<string[] | null> 
     return null;
   }
 
-  const model = process.env.DERIVE_DOMAINS_MODEL ?? 'deepseek-reasoner';
+  const primaryModel = process.env.DERIVE_DOMAINS_MODEL ?? 'deepseek-reasoner';
   const client = new OpenAI({ apiKey, baseURL: 'https://api.deepseek.com' });
-
   const { system, user } = buildDeriveDomainsPrompt(profile);
 
-  try {
-    const response = await client.chat.completions.create({
-      model,
-      messages: [
-        { role: 'system', content: system },
-        { role: 'user', content: user },
-      ],
-      max_tokens: 1024,
-      // deepseek-reasoner (R1) NÃO suporta response_format: json_object.
-      // O parâmetro é ignorado e o output vai pra reasoning_content, deixando
-      // content vazio. A instrução "Responda APENAS com um objeto JSON" no
-      // prompt é suficiente pro reasoning model.
-    });
-
-    // R1 sem response_format: content = resposta final, reasoning_content = CoT.
-    // Só usamos content. Se content vier vazio, o modelo não gerou resposta final
-    // (possível com reasoning models truncados).
-    const msg = response.choices[0]?.message as {
-      content?: string;
-      reasoning_content?: string;
-    };
-    const rawContent = msg?.content?.trim() ?? '';
-    if (!rawContent) {
-      console.warn(
-        '[deriveDomains] content vazio' +
-          (msg?.reasoning_content
-            ? ` (reasoning_content tem ${msg.reasoning_content.length} chars — ignorado)`
-            : ''),
-        ' — usando lista estática',
-      );
-      return null;
-    }
-
-    // extractJson do próprio codebase: lida com fences markdown, texto antes/depois
-    // do JSON, e brace-matching com escape de string.
-    let parsed: { domains?: unknown };
+  const models = resolveDeriveModels(primaryModel);
+  for (let i = 0; i < models.length; i++) {
+    const model = models[i];
+    const hasNext = i < models.length - 1;
     try {
-      parsed = extractJson<{ domains?: unknown }>(rawContent);
+      const domains = await tryDeriveWithModel(client, model, system, user);
+      if (domains) return domains;
+      if (hasNext) {
+        console.warn(
+          `[deriveDomains] modelo "${model}" não produziu domínios — tentando fallback "${models[i + 1]}"`,
+        );
+      }
     } catch (err) {
-      console.warn(
-        `[deriveDomains] JSON inválido na resposta (${rawContent.length} chars):`,
-        rawContent.slice(0, 300),
-      );
-      return null;
-    }
-
-    const obj = parsed as Record<string, unknown>;
-    if (!Array.isArray(obj.domains)) {
-      console.warn('[deriveDomains] resposta sem array "domains" — usando lista estática');
-      return null;
-    }
-
-    const domains = obj.domains.filter(
-      (d: unknown): d is string => typeof d === 'string' && d.trim().length > 0,
-    );
-
-    // Loga domínios fora do catálogo (não descarta — o LLM pode conhecer
-    // fontes boas que ainda não catalogamos).
-    for (const d of domains) {
-      if (!ALL_CATALOG_DOMAINS.has(d)) {
-        console.warn(`[deriveDomains] domínio fora do catálogo: "${d}" — mantendo mesmo assim`);
+      const m = err instanceof Error ? err.message : String(err);
+      if (hasNext) {
+        console.warn(
+          `[deriveDomains] erro no modelo "${model}" (${m}) — tentando fallback "${models[i + 1]}"`,
+        );
+      } else {
+        console.error(`[deriveDomains] erro no modelo "${model}":`, err);
       }
     }
-
-    const usage = response.usage;
-    console.log(
-      `[deriveDomains] ${domains.length} domínios derivados (modelo ${model}) | ` +
-        `in=${usage?.prompt_tokens ?? '?'} out=${usage?.completion_tokens ?? '?'} tok`,
-    );
-
-    return domains.length > 0 ? domains : null;
-  } catch (err) {
-    console.error('[deriveDomains] erro:', err);
-    return null;
   }
+
+  console.warn('[deriveDomains] nenhum modelo produziu domínios — usando lista estática');
+  return null;
 }

@@ -147,16 +147,33 @@ export async function generateBriefing(
   // O LLM pode injetar data de hoje quando o resultado original não tem
   // published_date — isso furaria o filterByFreshness. Aqui sobrescrevemos
   // a data do LLM com a data real do Tavily sempre que disponível.
+  //
+  // Estratégia em 2 passos:
+  //   1. Se o Tavily tem data → ela é a verdade. Sobrescreve a do LLM.
+  //   2. Se o Tavily NÃO tem data → não temos ground truth. Anulamos datas
+  //      que pareçam fabricadas (ex: hoje) pra não furar o filtro de frescor.
   const tavilyDateByUrl = new Map(
     rawResults.filter((r) => r.publishedDate).map((r) => [r.url, r.publishedDate as string]),
   );
+  let datesNulled = 0;
   for (const item of briefing.itens) {
     const realDate = tavilyDateByUrl.get(item.url);
-    if (realDate && item.data_publicacao !== realDate) {
+    if (realDate) {
+      // Passo 1: Tavily tem data → ground truth
+      if (item.data_publicacao !== realDate) {
+        console.warn(
+          `[curate] data corrigida (LLM: "${item.data_publicacao}" → Tavily: "${realDate}"): "${item.titulo}"`,
+        );
+        item.data_publicacao = realDate;
+      }
+    } else if (item.data_publicacao === janela.todayISO) {
+      // Passo 2: Tavily sem data E LLM colocou "hoje" → fabricação provável.
+      // Anula pra cair no filterByFreshness (que dropa item sem data).
       console.warn(
-        `[curate] data corrigida (LLM: "${item.data_publicacao}" → Tavily: "${realDate}"): "${item.titulo}"`,
+        `[curate] data anulada (Tavily sem data, LLM fabricou "${item.data_publicacao}"): "${item.titulo}"`,
       );
-      item.data_publicacao = realDate;
+      item.data_publicacao = '';
+      datesNulled++;
     }
   }
 
@@ -188,7 +205,7 @@ export async function generateBriefing(
 
   const cost = calculateCost(provider.model, result.usage);
   console.log(
-    `[curate] final: ${briefing.itens.length} item(s) | search→${rawResults.length}, IA selecionou→${beforeCount}, alucinadas→${hallucinatedUrlsDropped}, stale→${staleDropped.length}, link-morto→${deadDropped.length}`,
+    `[curate] final: ${briefing.itens.length} item(s) | search→${rawResults.length}, IA selecionou→${beforeCount}, alucinadas→${hallucinatedUrlsDropped}, data-anulada→${datesNulled}, stale→${staleDropped.length}, link-morto→${deadDropped.length}`,
   );
 
   return {

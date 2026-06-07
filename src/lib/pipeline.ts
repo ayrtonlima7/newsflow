@@ -143,6 +143,23 @@ export async function generateBriefing(
   });
   const hallucinatedUrlsDropped = beforeCount - briefing.itens.length;
 
+  // --- Cross-validação de datas contra os resultados Tavily (ground truth) ---
+  // O LLM pode injetar data de hoje quando o resultado original não tem
+  // published_date — isso furaria o filterByFreshness. Aqui sobrescrevemos
+  // a data do LLM com a data real do Tavily sempre que disponível.
+  const tavilyDateByUrl = new Map(
+    rawResults.filter((r) => r.publishedDate).map((r) => [r.url, r.publishedDate as string]),
+  );
+  for (const item of briefing.itens) {
+    const realDate = tavilyDateByUrl.get(item.url);
+    if (realDate && item.data_publicacao !== realDate) {
+      console.warn(
+        `[curate] data corrigida (LLM: "${item.data_publicacao}" → Tavily: "${realDate}"): "${item.titulo}"`,
+      );
+      item.data_publicacao = realDate;
+    }
+  }
+
   // --- Frescor: backstop usando a data que o modelo extraiu ---
   const { freshItems, staleDropped } = filterByFreshness(briefing.itens, janela.cutoffISO);
   if (staleDropped.length > 0) {

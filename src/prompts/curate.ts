@@ -82,7 +82,7 @@ INSTRUÇÕES:
   * titulo: claro e fiel ao conteúdo.
   * fonte: nome do veículo (extraia do domínio).
   * url: COPIE EXATAMENTE de um resultado acima. Proibido modificar.
-  * data_publicacao: a data do resultado (campo "publicado"); se faltar e não der pra inferir, use ${janela.todayISO}.
+  * data_publicacao: copie EXATAMENTE a data "publicado" do resultado de busca. Se o resultado não tiver data, tente inferir do título/trecho. Se não conseguir inferir com segurança, escreva null — NÃO invente data.
   * relevancia: "Alta" ou "Média".
   * corpo: 6 a 10 linhas, denso, na SUA VOZ de amigo. Com fatos concretos do trecho (números, nomes, datas, contexto, implicações) + uma linha integrada explicando por que importa PRA ESSA pessoa (sem cabeçalho "por que importa"). Autocontido: o leitor entende o assunto inteiro sem clicar. NÃO invente fatos além do trecho. Texto puro, SEM HTML.
 - Se NENHUM resultado for relevante, retorne "itens": [].

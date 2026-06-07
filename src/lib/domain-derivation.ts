@@ -3,31 +3,56 @@ import type { Profile } from './types';
 import { normalizeLocale } from './i18n';
 import { extractJson } from './providers';
 
-/** Catálogo completo de domínios brasileiros de qualidade, organizado por
+/** Catálogo completo de domínios de qualidade em português, organizado por
  *  vertical. Usado pelo prompt de derivação pra o LLM escolher um subconjunto
  *  relevante pro perfil. Se adicionar domínios na lista estática de
- *  pipeline.ts, adicione aqui também. */
+ *  pipeline.ts, adicione aqui também.
+ *
+ *  ~100 domínios: Brasil (notícia geral, esporte, economia, tech, cultura),
+ *  Portugal/lusofonia (observador, público, expresso, etc.), e internacionais
+ *  com edição em pt (BBC, DW, RFI). */
 const DOMAIN_CATALOG: Record<string, string[]> = {
-  'Notícia geral': [
+  'Notícia geral / Política': [
     'g1.globo.com', 'oglobo.globo.com', 'uol.com.br', 'folha.uol.com.br',
     'estadao.com.br', 'cnnbrasil.com.br', 'terra.com.br', 'metropoles.com',
     'r7.com', 'band.uol.com.br', 'cartacapital.com.br', 'gazetadopovo.com.br',
     'poder360.com.br', 'agenciabrasil.ebc.com.br', 'brasil.elpais.com',
+    'jovempan.com.br', 'ig.com.br', 'istoe.com.br', 'revistaforum.com.br',
+    'nexojornal.com.br', 'theintercept.com.br', 'antagonista.com.br',
+    'crusoe.com.br', 'jota.info', 'brasil247.com', 'brasildefato.com.br',
+    'revistapiaui.com.br', 'noticias.r7.com', 'epoca.globo.com',
+    'bbc.com/portuguese',
+  ],
+  'Mundo / Lusofonia': [
+    'dw.com/pt-br', 'rfi.fr/br', 'sputniknewsbrasil.com.br', 'rt.com/brasil',
+    'observador.pt', 'publico.pt', 'expresso.pt', 'cnnportugal.iol.pt',
+    'sicnoticias.pt', 'rtp.pt', 'tsf.pt', 'dn.pt', 'jornaldenegocios.pt',
+    'eco.sapo.pt', 'jornaleconomico.pt', 'visao.pt', 'noticiasaominuto.com',
+    'verangola.co.ao', 'ionline.pt',
   ],
   Esporte: [
     'ge.globo.com', 'lance.com.br', 'espn.com.br', 'trivela.com.br',
+    'sportv.globo.com', 'cbf.com.br', 'futebolinterior.com.br',
+    'torcedores.com', 'ogol.com.br', 'superesportes.com.br', 'placar.uol.com.br',
   ],
   'Economia / negócios': [
     'valor.globo.com', 'exame.com', 'infomoney.com.br', 'braziljournal.com',
-    'neofeed.com.br', 'moneytimes.com.br',
+    'neofeed.com.br', 'moneytimes.com.br', 'forbes.com.br',
+    'epocanegocios.globo.com', 'mercadoeconsumo.com.br', 'baguete.com.br',
+    'startupi.com.br', 'bloomberglinea.com',
   ],
   Tecnologia: [
     'tecmundo.com.br', 'canaltech.com.br', 'olhardigital.com.br',
-    'tecnoblog.net', 'meiobit.com', 'mobiletime.com.br',
+    'tecnoblog.net', 'meiobit.com', 'mobiletime.com.br', 'techtudo.com.br',
+    'tudocelular.com', 'showmetech.com.br', 'adrenaline.com.br',
+    'techguide.com.br', 'gizmodo.uol.com.br',
   ],
-  'Ciência / saúde / cultura': [
+  'Ciência / saúde / cultura / entretenimento': [
     'veja.abril.com.br', 'super.abril.com.br', 'saude.abril.com.br',
-    'revistagalileu.globo.com', 'omelete.com.br',
+    'revistagalileu.globo.com', 'omelete.com.br', 'cinepop.com.br',
+    'adorocinema.com', 'inovasocial.com.br', 'megacurioso.com.br',
+    'minhavida.com.br', 'rollingstone.com.br', 'gshow.globo.com', 'b9.com.br',
+    'spotniks.com', 'hypeness.com.br', 'contigo.uol.com.br',
   ],
 };
 
@@ -72,9 +97,10 @@ function buildDeriveDomainsPrompt(profile: Profile): { system: string; user: str
     .join('\n');
 
   const system = [
-    'Você é um especialista em mídia brasileira. Sua tarefa: dado o perfil de um usuário,',
-    'selecionar do catálogo abaixo os domínios de notícias brasileiros mais relevantes',
-    'pra cobrir os interesses daquela pessoa.',
+    'Você é um especialista em mídia. Sua tarefa: dado o perfil de um usuário,',
+    'selecionar do catálogo abaixo os domínios de notícias mais relevantes',
+    'pra cobrir os interesses daquela pessoa. O catálogo inclui fontes brasileiras,',
+    'portuguesas e internacionais com edição em português.',
     '',
     'Catálogo de domínios disponíveis (organizado por vertical):',
     catalogLines,
@@ -205,7 +231,7 @@ async function tryDeriveWithModel(
 }
 
 /**
- * Deriva uma lista de domínios brasileiros relevantes pro perfil usando um LLM.
+ * Deriva uma lista de domínios relevantes pro perfil usando um LLM.
  * Chamada 1× por save de perfil (onboarding/settings).
  *
  * Robusto a troca de modelo: tenta o `DERIVE_DOMAINS_MODEL` configurado e, se ele

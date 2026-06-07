@@ -8,28 +8,49 @@ import type { Profile, Briefing, BriefingItem, EmailOutput } from './types';
 import { frequenciaParaJanela } from './types';
 import { normalizeLocale, type Locale } from './i18n';
 
-/** Domínios de qualidade por idioma. O índice `news` da Tavily é global/inglês
- *  por padrão — pra usuários pt isso devolve esporte/notícia dos EUA em vez de
- *  conteúdo BR. Restringir a fontes locais (include_domains) resolve. en/es
- *  ficam globais por ora (sem lista). */
+/** Domínios de qualidade em português por idioma. ~100 fontes: Brasil,
+ *  Portugal/lusofonia e internacionais com edição em pt. O índice `news` da
+ *  Tavily é global/inglês por padrão — pra usuários pt isso devolve lixo dos EUA
+ *  sem restrição. en/es ficam globais (sem lista).
+ *  Mantenha sincronizado com DOMAIN_CATALOG em domain-derivation.ts. */
 const DOMAINS_BY_LOCALE: Partial<Record<Locale, string[]>> = {
   pt: [
-    // Notícia geral
+    // Notícia geral / Política (30)
     'g1.globo.com', 'oglobo.globo.com', 'uol.com.br', 'folha.uol.com.br',
     'estadao.com.br', 'cnnbrasil.com.br', 'terra.com.br', 'metropoles.com',
     'r7.com', 'band.uol.com.br', 'cartacapital.com.br', 'gazetadopovo.com.br',
     'poder360.com.br', 'agenciabrasil.ebc.com.br', 'brasil.elpais.com',
-    // Esporte
+    'jovempan.com.br', 'ig.com.br', 'istoe.com.br', 'revistaforum.com.br',
+    'nexojornal.com.br', 'theintercept.com.br', 'antagonista.com.br',
+    'crusoe.com.br', 'jota.info', 'brasil247.com', 'brasildefato.com.br',
+    'revistapiaui.com.br', 'noticias.r7.com', 'epoca.globo.com',
+    'bbc.com/portuguese',
+    // Mundo / Lusofonia (19)
+    'dw.com/pt-br', 'rfi.fr/br', 'sputniknewsbrasil.com.br', 'rt.com/brasil',
+    'observador.pt', 'publico.pt', 'expresso.pt', 'cnnportugal.iol.pt',
+    'sicnoticias.pt', 'rtp.pt', 'tsf.pt', 'dn.pt', 'jornaldenegocios.pt',
+    'eco.sapo.pt', 'jornaleconomico.pt', 'visao.pt', 'noticiasaominuto.com',
+    'verangola.co.ao', 'ionline.pt',
+    // Esporte (11)
     'ge.globo.com', 'lance.com.br', 'espn.com.br', 'trivela.com.br',
-    // Economia / negócios
+    'sportv.globo.com', 'cbf.com.br', 'futebolinterior.com.br',
+    'torcedores.com', 'ogol.com.br', 'superesportes.com.br', 'placar.uol.com.br',
+    // Economia / negócios (12)
     'valor.globo.com', 'exame.com', 'infomoney.com.br', 'braziljournal.com',
-    'neofeed.com.br', 'moneytimes.com.br',
-    // Tecnologia
+    'neofeed.com.br', 'moneytimes.com.br', 'forbes.com.br',
+    'epocanegocios.globo.com', 'mercadoeconsumo.com.br', 'baguete.com.br',
+    'startupi.com.br', 'bloomberglinea.com',
+    // Tecnologia (12)
     'tecmundo.com.br', 'canaltech.com.br', 'olhardigital.com.br',
-    'tecnoblog.net', 'meiobit.com', 'mobiletime.com.br',
-    // Ciência / saúde / cultura
+    'tecnoblog.net', 'meiobit.com', 'mobiletime.com.br', 'techtudo.com.br',
+    'tudocelular.com', 'showmetech.com.br', 'adrenaline.com.br',
+    'techguide.com.br', 'gizmodo.uol.com.br',
+    // Ciência / saúde / cultura / entretenimento (16)
     'veja.abril.com.br', 'super.abril.com.br', 'saude.abril.com.br',
-    'revistagalileu.globo.com', 'omelete.com.br',
+    'revistagalileu.globo.com', 'omelete.com.br', 'cinepop.com.br',
+    'adorocinema.com', 'inovasocial.com.br', 'megacurioso.com.br',
+    'minhavida.com.br', 'rollingstone.com.br', 'gshow.globo.com', 'b9.com.br',
+    'spotniks.com', 'hypeness.com.br', 'contigo.uol.com.br',
   ],
 };
 

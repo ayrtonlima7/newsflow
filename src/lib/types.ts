@@ -89,8 +89,9 @@ export interface EmailOutput {
 }
 
 export interface JanelaFrescor {
-  /** Janela em dias. Conteúdo mais antigo que isso é REJEITADO. Casa exatamente
-   *  com a cadência de entrega: diária → 1, 3-day → 3, semanal → 7. */
+  /** Janela efetiva em dias (cadência-base + folga de frescor). Alimenta tanto
+   *  a busca (Tavily.days) quanto o corte de frescor. Cadência-base diária → 3,
+   *  3-day → 5, semanal → 9 (base 1/3/7 + GRACE_DIAS). */
   janelaDias: number;
   /** Texto pro prompt descrevendo a janela. */
   rotulo: string;
@@ -111,21 +112,29 @@ export function frequenciaParaJanela(frequencia: string): JanelaFrescor {
   // Normaliza pra slug (tolera slug novo, rótulo PT legado e palavras-chave EN/ES).
   const slug = normalizeFrequencia(frequencia);
 
-  // Janela em dias + quantidade alvo de itens.
+  // Janela-base da cadência + quantidade alvo de itens.
   // Quantidades incluem buffer pra validação dropar alguns; usuário recebe ~60-80%.
-  let janelaDias = 1;
+  let baseDias = 1;
   let itemsMin = 5;
   let itemsMax = 8;
 
   if (slug === 'weekly') {
-    janelaDias = 7;
+    baseDias = 7;
     itemsMin = 10;
     itemsMax = 15;
   } else if (slug === 'every3days') {
-    janelaDias = 3;
+    baseDias = 3;
     itemsMin = 7;
     itemsMax = 10;
   }
+
+  // Folga sobre a janela-base. O backstop de frescor existe pra cortar conteúdo
+  // MUITO antigo (semanas/anos) — não pra aparar notícia de 2-3 dias. Sem a folga,
+  // a janela diária (24h) somada ao slop de fuso do published_date da Tavily
+  // derrubava a maioria dos itens frescos e o briefing vinha quase vazio. A folga
+  // também alimenta a busca (Tavily.days) pra garantir oferta em dias de pouca notícia.
+  const GRACE_DIAS = 2;
+  const janelaDias = baseDias + GRACE_DIAS;
 
   const cutoff = new Date(today.getTime() - janelaDias * 24 * 60 * 60 * 1000);
   const cutoffISO = cutoff.toISOString().split('T')[0];

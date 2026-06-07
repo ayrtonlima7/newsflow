@@ -107,23 +107,44 @@ RESPONDA APENAS COM UM JSON VÁLIDO, sem markdown, sem texto antes ou depois:
   return { system, user };
 }
 
+/** Palavra de intenção de NOTÍCIA por idioma. */
+const NEWS_WORD: Record<Locale, string> = { pt: 'notícias', en: 'news', es: 'noticias' };
+
+/**
+ * Anexa um termo de intenção de NOTÍCIA à query.
+ *
+ * Por quê: no índice `news` da Tavily, nomes próprios "crus" (times, pessoas,
+ * empresas) casam com páginas PERENES/antigas — ex: a query "Botafogo" devolve
+ * fichas de jogo de 2018/2021 ("Fluminense x Botafogo"), que o filtro de frescor
+ * depois descarta → briefing vazio. Acrescentar "notícias" desloca o match pra
+ * matérias recentes (medido: "Botafogo" → 0 frescos; "Botafogo notícias" → 6).
+ * Em tópicos amplos ("inteligência artificial") é neutro. Idempotente: não
+ * duplica se a palavra já estiver na query. */
+function withNewsIntent(query: string, locale: Locale): string {
+  const word = NEWS_WORD[locale];
+  const re = new RegExp(`\\b${word}\\b`, 'i');
+  return re.test(query) ? query : `${query} ${word}`;
+}
+
 /** Constrói as queries de busca a partir do perfil. Combina tópicos normalizados
- *  com o tema pra dar contexto. Referencias entram como query separada quando há. */
-export function buildSearchQueries(profile: Profile): string[] {
-  const p = profileForPrompt(profile);
+ *  com o tema pra dar contexto, e anexa intenção de notícia (withNewsIntent). */
+export function buildSearchQueries(profile: Profile, locale: Locale = 'pt'): string[] {
+  const p = profileForPrompt(profile, locale);
   const queries: string[] = [];
 
   // Uma query por tópico (são os sinais mais específicos)
   for (const topico of p.topicos) {
-    if (topico && topico.trim()) queries.push(topico.trim());
+    if (topico && topico.trim()) queries.push(withNewsIntent(topico.trim(), locale));
   }
 
   // Se não houver tópicos (raro), cai pro tema
   if (queries.length === 0 && p.tema.length > 0) {
-    queries.push(p.tema.join(' '));
+    queries.push(withNewsIntent(p.tema.join(' '), locale));
   }
 
   // Cap em 6 queries pra não estourar o free tier da Tavily
   return queries.slice(0, 6);
 }
+
+export { withNewsIntent };
 

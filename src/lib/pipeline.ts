@@ -79,7 +79,7 @@ export async function generateBriefing(
   const since = () => `${((Date.now() - t0) / 1000).toFixed(1)}s`;
 
   // --- Passo 1: busca real via Tavily ---
-  const queries = buildSearchQueries(profile);
+  const queries = buildSearchQueries(profile, locale);
   if (queries.length === 0) {
     throw new Error('curate: nenhuma query de busca derivada do perfil');
   }
@@ -144,36 +144,23 @@ export async function generateBriefing(
   const hallucinatedUrlsDropped = beforeCount - briefing.itens.length;
 
   // --- Cross-validação de datas contra os resultados Tavily (ground truth) ---
-  // O LLM pode injetar data de hoje quando o resultado original não tem
-  // published_date — isso furaria o filterByFreshness. Aqui sobrescrevemos
-  // a data do LLM com a data real do Tavily sempre que disponível.
-  //
-  // Estratégia em 2 passos:
-  //   1. Se o Tavily tem data → ela é a verdade. Sobrescreve a do LLM.
-  //   2. Se o Tavily NÃO tem data → não temos ground truth. Anulamos datas
-  //      que pareçam fabricadas (ex: hoje) pra não furar o filtro de frescor.
+  // Quando o Tavily tem published_date, ELA é a verdade — sobrescreve a data que
+  // o LLM extraiu (que pode estar errada). Quando o Tavily NÃO tem data, deixamos
+  // como está: NÃO anulamos nem descartamos. O item veio de uma busca de NOTÍCIA
+  // limitada por `days` (Tavily já restringiu por janela), e dropar por "sem data"
+  // eliminava justamente as matérias frescas sem carimbo — era a causa do briefing
+  // vir quase vazio. (Itens genuinamente antigos costumam VIR com data no Tavily e
+  // caem no corte de frescor abaixo.)
   const tavilyDateByUrl = new Map(
     rawResults.filter((r) => r.publishedDate).map((r) => [r.url, r.publishedDate as string]),
   );
-  let datesNulled = 0;
   for (const item of briefing.itens) {
     const realDate = tavilyDateByUrl.get(item.url);
-    if (realDate) {
-      // Passo 1: Tavily tem data → ground truth
-      if (item.data_publicacao !== realDate) {
-        console.warn(
-          `[curate] data corrigida (LLM: "${item.data_publicacao}" → Tavily: "${realDate}"): "${item.titulo}"`,
-        );
-        item.data_publicacao = realDate;
-      }
-    } else if (item.data_publicacao === janela.todayISO) {
-      // Passo 2: Tavily sem data E LLM colocou "hoje" → fabricação provável.
-      // Anula pra cair no filterByFreshness (que dropa item sem data).
+    if (realDate && item.data_publicacao !== realDate) {
       console.warn(
-        `[curate] data anulada (Tavily sem data, LLM fabricou "${item.data_publicacao}"): "${item.titulo}"`,
+        `[curate] data corrigida (LLM: "${item.data_publicacao}" → Tavily: "${realDate}"): "${item.titulo}"`,
       );
-      item.data_publicacao = '';
-      datesNulled++;
+      item.data_publicacao = realDate;
     }
   }
 
@@ -205,7 +192,7 @@ export async function generateBriefing(
 
   const cost = calculateCost(provider.model, result.usage);
   console.log(
-    `[curate] final: ${briefing.itens.length} item(s) | search→${rawResults.length}, IA selecionou→${beforeCount}, alucinadas→${hallucinatedUrlsDropped}, data-anulada→${datesNulled}, stale→${staleDropped.length}, link-morto→${deadDropped.length}`,
+    `[curate] final: ${briefing.itens.length} item(s) | search→${rawResults.length}, IA selecionou→${beforeCount}, alucinadas→${hallucinatedUrlsDropped}, stale→${staleDropped.length}, link-morto→${deadDropped.length}`,
   );
 
   return {
@@ -234,12 +221,14 @@ function emptyUsage(): PipelineUsage {
 }
 
 /**
- * Filtra itens por frescor — descarta os que estão fora da janela ou sem data.
+ * Filtra itens por frescor — descarta SÓ os que têm data válida E antiga.
  * Roda ANTES da validação de URL (não vale gastar requests HTTP em conteúdo velho).
  *
- * Critérios pra descarte:
- *   - data_publicacao ausente ou inválida
- *   - data_publicacao < cutoffISO (mais antiga que o limite máximo)
+ * Política (recall > precisão, porque o sintoma era briefing vazio):
+ *   - data ausente ou em formato inesperado → MANTÉM. O item veio de uma busca de
+ *     notícia limitada por `days`; sem ground truth pra refutar, não descartamos.
+ *   - data válida (YYYY-MM-DD) e < cutoffISO → DESCARTA (antigo confirmado).
+ *   - data válida e dentro da janela → MANTÉM.
  */
 function filterByFreshness(
   items: BriefingItem[],
@@ -250,16 +239,12 @@ function filterByFreshness(
 
   for (const item of items) {
     const date = item.data_publicacao;
-    if (!date || typeof date !== 'string') {
-      staleDropped.push({ item, reason: 'sem data_publicacao' });
+    // Sem data ou formato inesperado → mantém (não temos como provar que é velho).
+    if (!date || typeof date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      freshItems.push(item);
       continue;
     }
-    // Validação básica de formato YYYY-MM-DD (não checagem rigorosa)
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
-      staleDropped.push({ item, reason: `data inválida: "${date}"` });
-      continue;
-    }
-    // Comparação ISO string funciona porque YYYY-MM-DD ordena corretamente
+    // Comparação ISO string funciona porque YYYY-MM-DD ordena corretamente.
     if (date < cutoffISO) {
       staleDropped.push({ item, reason: `antigo (publicado em ${date}, cutoff ${cutoffISO})` });
       continue;

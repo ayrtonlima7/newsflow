@@ -15,6 +15,7 @@
     "deliver": "tsx src/cli/deliver.ts",
     "preview": "tsx src/cli/preview.ts",
     "reset-users": "tsx src/cli/reset-users.ts",
+    "rederive-domains": "tsx src/cli/rederive-domains.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest"

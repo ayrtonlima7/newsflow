@@ -23,6 +23,7 @@ npm run send-test                          # send output/emails/latest via Resen
 npm run deliver -- <email|user_id> [--dry] # full pipeline for a real DB user (writes briefings/deliveries rows)
 npm run preview -- [delivery_id]           # save a delivery's HTML to output/previews/ and open it
 npm run reset-users                        # ⚠️ deletes ALL auth users + cascades (profiles/briefings/deliveries). Beta reset.
+npm run rederive-domains                   # re-derive dominios_busca for pt profiles that are null/empty (dry-run optional)
 ```
 
 Cron endpoint (manual trigger for testing):

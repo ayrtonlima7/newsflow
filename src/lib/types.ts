@@ -91,7 +91,7 @@ export interface EmailOutput {
 export interface JanelaFrescor {
   /** Janela efetiva em dias (cadência-base + folga de frescor). Alimenta tanto
    *  a busca (Tavily.days) quanto o corte de frescor. Cadência-base diária → 3,
-   *  3-day → 5, semanal → 9 (base 1/3/7 + GRACE_DIAS). */
+   *  3-day → 6, semanal → 10 (base 1/3/7 + GRACE_DIAS). */
   janelaDias: number;
   /** Texto pro prompt descrevendo a janela. */
   rotulo: string;
@@ -133,7 +133,7 @@ export function frequenciaParaJanela(frequencia: string): JanelaFrescor {
   // a janela diária (24h) somada ao slop de fuso do published_date da Tavily
   // derrubava a maioria dos itens frescos e o briefing vinha quase vazio. A folga
   // também alimenta a busca (Tavily.days) pra garantir oferta em dias de pouca notícia.
-  const GRACE_DIAS = 2;
+  const GRACE_DIAS = 3;
   const janelaDias = baseDias + GRACE_DIAS;
 
   const cutoff = new Date(today.getTime() - janelaDias * 24 * 60 * 60 * 1000);

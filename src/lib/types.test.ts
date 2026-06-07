@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { frequenciaParaJanela } from './types';
 
 // GRACE_DIAS aplicada em frequenciaParaJanela (janela = base + folga).
-const GRACE = 2;
+const GRACE = 3;
 
 describe('frequenciaParaJanela', () => {
   it('daily → janela base 1 + folga, 5-8 itens', () => {

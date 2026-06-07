@@ -181,6 +181,7 @@ export async function GET(req: NextRequest) {
           objetivo: profile.objetivo ?? [],
           topicos: profile.topicos ?? [],
           topicos_busca: profile.topicos_busca ?? undefined,
+          dominios_busca: profile.dominios_busca ?? undefined,
           referencias: profile.referencias ?? [],
           formatos: profile.formatos ?? [],
           ignorar: profile.ignorar ?? [],

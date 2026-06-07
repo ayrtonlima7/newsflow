@@ -53,6 +53,17 @@ export interface PipelineMeta {
   hallucinatedUrlsDropped?: number;
 }
 
+/** Resolve a lista de domínios pra restrição de busca: usa a lista derivada por
+ *  perfil se disponível, senão cai na estática. pt-only; en/es retornam undefined
+ *  (sem restrição). */
+function resolveDomains(profile: Profile, locale: Locale): string[] | undefined {
+  if (locale !== 'pt') return undefined;
+  if (profile.dominios_busca && profile.dominios_busca.length > 0) {
+    return profile.dominios_busca;
+  }
+  return DOMAINS_BY_LOCALE[locale];
+}
+
 /**
  * Gera o briefing em 2 passos:
  *   1. Tavily busca conteúdo REAL e fresco (URLs verdadeiras + datas).
@@ -77,7 +88,7 @@ export async function generateBriefing(
     days: janela.janelaDias,
     maxResults: 8,
     topic: 'news',
-    includeDomains: DOMAINS_BY_LOCALE[locale],
+    includeDomains: resolveDomains(profile, locale),
   });
   console.log(
     `[timing] Tavily (${queries.length} queries): ${((Date.now() - tTavily) / 1000).toFixed(1)}s → ${rawResults.length} resultados | total ${since()}`,

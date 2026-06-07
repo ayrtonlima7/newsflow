@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { getProvider, extractJson } from '@/src/lib/providers';
 import { normalizeTopics } from '@/src/lib/topic-normalization';
+import { deriveDomains } from '@/src/lib/domain-derivation';
 import type { Profile } from '@/src/lib/types';
 
 export interface TopicSuggestionsContext {
@@ -127,12 +128,15 @@ export async function saveProfile(profile: Profile): Promise<{ ok: boolean; erro
     return { ok: false, error: 'escolha pelo menos um formato' };
   }
 
-  const topicos_busca = await normalizeTopics(profile.topicos, {
-    tema: profile.tema,
-    contexto: profile.contexto.join(', '),
-    descricao_livre: profile.descricao_livre,
-    objetivo: profile.objetivo.join(', '),
-  });
+  const [topicos_busca, dominios_busca] = await Promise.all([
+    normalizeTopics(profile.topicos, {
+      tema: profile.tema,
+      contexto: profile.contexto.join(', '),
+      descricao_livre: profile.descricao_livre,
+      objetivo: profile.objetivo.join(', '),
+    }),
+    deriveDomains(profile),
+  ]);
 
   const { error } = await supabase.from('profiles').upsert(
     {
@@ -144,6 +148,7 @@ export async function saveProfile(profile: Profile): Promise<{ ok: boolean; erro
       objetivo: profile.objetivo,
       topicos: profile.topicos,
       topicos_busca,
+      dominios_busca,
       referencias: profile.referencias ?? [],
       formatos: profile.formatos,
       ignorar: profile.ignorar ?? [],

@@ -6,6 +6,7 @@ import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { normalizeTopics } from '@/src/lib/topic-normalization';
+import { deriveDomains } from '@/src/lib/domain-derivation';
 import { runDeliveryPipeline } from '@/src/lib/delivery';
 import type { Profile } from '@/src/lib/types';
 import { SAMPLE_COOLDOWN_MS } from './constants';
@@ -61,12 +62,27 @@ export async function updateProfile(
     return { ok: false, error: 'escolha um horário' };
   }
 
-  const topicos_busca = await normalizeTopics(input.topicos, {
-    tema: input.tema,
-    contexto: input.contexto.join(', '),
-    descricao_livre: input.descricao_livre,
-    objetivo: input.objetivo.join(', '),
-  });
+  const [topicos_busca, dominios_busca] = await Promise.all([
+    normalizeTopics(input.topicos, {
+      tema: input.tema,
+      contexto: input.contexto.join(', '),
+      descricao_livre: input.descricao_livre,
+      objetivo: input.objetivo.join(', '),
+    }),
+    deriveDomains({
+      nome: input.nome,
+      tema: input.tema,
+      contexto: input.contexto,
+      descricao_livre: input.descricao_livre,
+      objetivo: input.objetivo,
+      topicos: input.topicos,
+      referencias: input.referencias,
+      formatos: input.formatos,
+      ignorar: input.ignorar,
+      frequencia: input.frequencia,
+      horario: input.horario,
+    }),
+  ]);
 
   const { error } = await supabase
     .from('profiles')
@@ -78,6 +94,7 @@ export async function updateProfile(
       objetivo: input.objetivo,
       topicos: input.topicos,
       topicos_busca,
+      dominios_busca,
       referencias: input.referencias ?? [],
       formatos: input.formatos,
       ignorar: input.ignorar ?? [],
@@ -144,6 +161,7 @@ export async function sendSampleNow(): Promise<SampleResult> {
     objetivo: profileRow.objetivo ?? [],
     topicos: profileRow.topicos ?? [],
     topicos_busca: profileRow.topicos_busca ?? undefined,
+    dominios_busca: profileRow.dominios_busca ?? undefined,
     referencias: profileRow.referencias ?? [],
     formatos: profileRow.formatos ?? [],
     ignorar: profileRow.ignorar ?? [],

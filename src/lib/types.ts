@@ -47,6 +47,11 @@ export interface Profile {
   /** Idioma do usuário: 'pt' | 'en' | 'es' (default 'pt'). Define a língua da
    *  curadoria e do email. Normalizado via normalizeLocale() no uso. */
   idioma?: string;
+
+  /** Domínios brasileiros mais relevantes pro perfil (derivados por LLM no save).
+   *  Só preenchido pra usuários pt. Se undefined/null, o pipeline usa a lista
+   *  estática DOMAINS_BY_LOCALE['pt']. */
+  dominios_busca?: string[];
 }
 
 export type Relevancia = 'Alta' | 'Média';

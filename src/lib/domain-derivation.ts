@@ -124,10 +124,18 @@ export async function deriveDomains(profile: Profile): Promise<string[] | null> 
         { role: 'user', content: user },
       ],
       max_tokens: 1024,
-      response_format: { type: 'json_object' },
+      // deepseek-reasoner (R1) NÃO suporta response_format: json_object.
+      // O parâmetro é ignorado e o output vai pra reasoning_content, deixando
+      // content vazio. A instrução "Responda APENAS com um objeto JSON" no
+      // prompt é suficiente pro reasoning model.
     });
 
-    const text = response.choices[0]?.message?.content?.trim() ?? '';
+    // R1 pode devolver conteúdo em reasoning_content em vez de content.
+    const msg = response.choices[0]?.message as {
+      content?: string;
+      reasoning_content?: string;
+    };
+    const text = (msg?.content?.trim() || msg?.reasoning_content?.trim()) ?? '';
     if (!text) {
       console.warn('[deriveDomains] resposta vazia do modelo — usando lista estática');
       return null;

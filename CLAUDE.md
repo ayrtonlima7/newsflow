@@ -93,7 +93,7 @@ The onboarding was redesigned from "professional-centric" (area/cargo/tom) to "i
 
 ### Domain derivation (`src/lib/domain-derivation.ts`)
 
-On profile save (onboarding + settings), `deriveDomains(profile)` calls **DeepSeek reasoning** (`DERIVE_DOMAINS_MODEL`, default `deepseek-reasoner`) to map the user's topics/context/objectives → a subset of Brazilian news domains from a curated catalog (same 35 domains as the static list, organized by vertical). Key facts:
+On profile save (onboarding + settings), `deriveDomains(profile)` calls **DeepSeek** (`DERIVE_DOMAINS_MODEL`, default `deepseek-chat`) to map the user's topics/context/objectives → a subset of Brazilian news domains from a curated catalog (same 35 domains as the static list, organized by vertical). Key facts:
 
 - **Runs 1× per profile save**, not per delivery. Runs in parallel with `normalizeTopics()` via `Promise.all`.
 - **Target ~50 domains** (catalog has 35; the LLM can include domains outside the catalog — logged as warnings but kept). No minimum floor.
@@ -103,7 +103,7 @@ On profile save (onboarding + settings), `deriveDomains(profile)` calls **DeepSe
 - **pt-only**: en/es return `null` immediately (no domain restriction).
 - **Consumed by** `resolveDomains()` in `pipeline.ts`: `profile.dominios_busca` → static list → `undefined`.
 - **Standalone client**: creates its own OpenAI client pointing to DeepSeek (same `DEEPSEEK_API_KEY`, different model). Does NOT use `getProvider()` — keeps the model override isolated.
-- **Env var**: `DERIVE_DOMAINS_MODEL` (default `deepseek-reasoner`; `deepseek-chat` and `deepseek-v4-flash` also work). Set in Vercel env (production) — not in `.env.example` as active, only documented.
+- **Env var**: `DERIVE_DOMAINS_MODEL` (default `deepseek-chat`; `deepseek-v4-flash`/`pro` also work). ⚠️ **`deepseek-reasoner` is a bad fit here** — at `max_tokens: 4096` the CoT eats the budget and `content` comes back empty (measured: ~3.5k chars of reasoning, empty content, 9.5s wasted). If you must use it, the chat fallback recovers, but you pay a wasted reasoner call. Set in Vercel env (production) — not in `.env.example` as active, only documented.
 - **Migration**: `0013_dominios_busca.sql` adds the `dominios_busca text[]` column + backfills with the static list for existing pt profiles.
 
 ### Cron / scheduling

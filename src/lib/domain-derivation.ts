@@ -46,6 +46,14 @@ export function isReasonerModel(model: string): boolean {
   return /reasoner|r1/i.test(model);
 }
 
+/** Normaliza um domínio devolvido pelo LLM. Domínios são case-insensitive e nunca
+ *  têm espaço — então minúscula + remover espaços é sempre seguro e ainda cura
+ *  typos do modelo (ex: "agencia Brasil.ebc.com.br" → "agenciabrasil.ebc.com.br",
+ *  que volta a casar com o catálogo). */
+export function normalizeDomain(raw: string): string {
+  return raw.trim().toLowerCase().replace(/\s+/g, '');
+}
+
 /** Ordena os modelos a tentar: o configurado primeiro, depois o fallback
  *  confiável (se for diferente). Sem duplicar quando já são iguais. */
 export function resolveDeriveModels(primary: string): string[] {
@@ -125,11 +133,15 @@ async function tryDeriveWithModel(
       { role: 'system', content: system },
       { role: 'user', content: user },
     ],
-    max_tokens: 1024,
+    // Folgado pro reasoner (R1): com 1024, o reasoning_content (CoT) consome todo
+    // o orçamento e o content final vem VAZIO (medido: ~3.5k chars de CoT → content
+    // vazio). 4096 dá espaço pra CoT + resposta. Pra chat/v4-flash é só um teto —
+    // só pagamos os tokens de saída reais (a lista de domínios é curta).
+    max_tokens: 4096,
     // Modelos não-reasoner suportam response_format json_object → resposta mais
     // previsível. deepseek-reasoner (R1) NÃO suporta (ignora e manda tudo pro
-    // reasoning_content, deixando content vazio) — nesse caso confiamos na
-    // instrução "Responda APENAS com JSON" do prompt + extractJson.
+    // reasoning_content) — nesse caso confiamos na instrução "Responda APENAS com
+    // JSON" do prompt + extractJson.
     ...(isReasonerModel(model)
       ? {}
       : { response_format: { type: 'json_object' as const } }),
@@ -171,9 +183,9 @@ async function tryDeriveWithModel(
     return null;
   }
 
-  const domains = obj.domains.filter(
-    (d: unknown): d is string => typeof d === 'string' && d.trim().length > 0,
-  );
+  const domains = obj.domains
+    .filter((d: unknown): d is string => typeof d === 'string' && d.trim().length > 0)
+    .map(normalizeDomain);
 
   // Loga domínios fora do catálogo (não descarta — o LLM pode conhecer
   // fontes boas que ainda não catalogamos).
@@ -216,7 +228,11 @@ export async function deriveDomains(profile: Profile): Promise<string[] | null> 
     return null;
   }
 
-  const primaryModel = process.env.DERIVE_DOMAINS_MODEL ?? 'deepseek-reasoner';
+  // Default deepseek-chat (não reasoner): a tarefa é selecionar domínios de um
+  // catálogo — não precisa de raciocínio. Chat é rápido (~3s), barato, suporta
+  // JSON mode e SEMPRE popula content. O reasoner ficava 9.5s e voltava vazio
+  // (todo o orçamento ia pro CoT). Pode sobrescrever via DERIVE_DOMAINS_MODEL.
+  const primaryModel = process.env.DERIVE_DOMAINS_MODEL ?? 'deepseek-chat';
   const client = new OpenAI({ apiKey, baseURL: 'https://api.deepseek.com' });
   const { system, user } = buildDeriveDomainsPrompt(profile);
 

@@ -93,6 +93,7 @@ function resolveDomains(profile: Profile, locale: Locale): string[] | undefined 
  */
 export async function generateBriefing(
   profile: Profile,
+  opts: { excludeUrls?: Set<string> } = {},
 ): Promise<{ briefing: Briefing; meta: PipelineMeta }> {
   const janela = frequenciaParaJanela(profile.frequencia);
   const locale = normalizeLocale(profile.idioma);
@@ -105,7 +106,7 @@ export async function generateBriefing(
     throw new Error('curate: nenhuma query de busca derivada do perfil');
   }
   const tTavily = Date.now();
-  const rawResults = await tavilySearchMany(queries, {
+  let rawResults = await tavilySearchMany(queries, {
     days: janela.janelaDias,
     maxResults: 8,
     topic: 'news',
@@ -114,6 +115,19 @@ export async function generateBriefing(
   console.log(
     `[timing] Tavily (${queries.length} queries): ${((Date.now() - tTavily) / 1000).toFixed(1)}s → ${rawResults.length} resultados | total ${since()}`,
   );
+
+  // --- Dedup entre entregas: remove URLs que o usuário já recebeu nas edições
+  //     recentes ANTES do LLM ver (assim ele escolhe alternativas frescas em vez
+  //     de re-selecionar a mesma matéria que continua relevante). Melhor menos
+  //     itens novos que repetir o de ontem. ---
+  if (opts.excludeUrls && opts.excludeUrls.size > 0) {
+    const before = rawResults.length;
+    rawResults = rawResults.filter((r) => !opts.excludeUrls!.has(r.url));
+    const removed = before - rawResults.length;
+    if (removed > 0) {
+      console.log(`[curate] dedup: ${removed} resultado(s) já enviado(s) removido(s) (${rawResults.length} restantes)`);
+    }
+  }
 
   if (rawResults.length === 0) {
     // Sem resultados — retorna briefing vazio (delivery vira skipped_empty).
@@ -186,12 +200,26 @@ export async function generateBriefing(
   }
 
   // --- Frescor: backstop usando a data que o modelo extraiu ---
-  const { freshItems, staleDropped } = filterByFreshness(briefing.itens, janela.cutoffISO);
+  const { datedFresh, undated, staleDropped } = filterByFreshness(briefing.itens, janela.cutoffISO);
   if (staleDropped.length > 0) {
     console.warn(`[curate] ${staleDropped.length} item(s) descartado(s) por frescor (cutoff ${janela.cutoffISO}):`);
     for (const d of staleDropped) {
       console.warn(`  - "${d.item.titulo}" → ${d.reason}`);
     }
+  }
+
+  // Itens datados-frescos são preferidos; os sem data entram só como PREENCHIMENTO
+  // até atingir itemsMin (evita ensaio atemporal dominar a edição, mas mantém
+  // recall em dia fraco). Em dia cheio (datados >= itemsMin), os sem data caem.
+  const freshItems = [...datedFresh];
+  let undatedKept = 0;
+  if (freshItems.length < janela.itemsMin && undated.length > 0) {
+    undatedKept = Math.min(janela.itemsMin - freshItems.length, undated.length);
+    freshItems.push(...undated.slice(0, undatedKept));
+  }
+  const undatedDropped = undated.length - undatedKept;
+  if (undatedDropped > 0) {
+    console.warn(`[curate] ${undatedDropped} item(s) sem data descartado(s) (já havia ${datedFresh.length} datados, itemsMin=${janela.itemsMin})`);
   }
 
   // --- Validação LENIENTE só dos selecionados (~7, não 32) ---
@@ -213,7 +241,7 @@ export async function generateBriefing(
 
   const cost = calculateCost(provider.model, result.usage);
   console.log(
-    `[curate] final: ${briefing.itens.length} item(s) | search→${rawResults.length}, IA selecionou→${beforeCount}, alucinadas→${hallucinatedUrlsDropped}, stale→${staleDropped.length}, link-morto→${deadDropped.length}`,
+    `[curate] final: ${briefing.itens.length} item(s) | search→${rawResults.length}, IA selecionou→${beforeCount}, alucinadas→${hallucinatedUrlsDropped}, stale→${staleDropped.length}, sem-data-dropados→${undatedDropped}, link-morto→${deadDropped.length}`,
   );
 
   return {
@@ -242,27 +270,28 @@ function emptyUsage(): PipelineUsage {
 }
 
 /**
- * Filtra itens por frescor — descarta SÓ os que têm data válida E antiga.
- * Roda ANTES da validação de URL (não vale gastar requests HTTP em conteúdo velho).
+ * Classifica itens por frescor em três baldes. Roda ANTES da validação de URL.
  *
- * Política (recall > precisão, porque o sintoma era briefing vazio):
- *   - data ausente ou em formato inesperado → MANTÉM. O item veio de uma busca de
- *     notícia limitada por `days`; sem ground truth pra refutar, não descartamos.
- *   - data válida (YYYY-MM-DD) e < cutoffISO → DESCARTA (antigo confirmado).
- *   - data válida e dentro da janela → MANTÉM.
+ *   - data válida (YYYY-MM-DD) dentro da janela → `datedFresh` (preferidos).
+ *   - data válida e < cutoffISO → `staleDropped` (antigo confirmado, descartado).
+ *   - data ausente/inválida → `undated`. NÃO é descartado aqui, mas também não é
+ *     "fresco datado": o chamador o usa só como PREENCHIMENTO quando faltam
+ *     datados (evita ensaio atemporal sem data dominar a edição → sensação de
+ *     notícia velha), mantendo recall em dia fraco.
  */
-function filterByFreshness(
+export function filterByFreshness(
   items: BriefingItem[],
   cutoffISO: string,
-): { freshItems: BriefingItem[]; staleDropped: DroppedItem[] } {
-  const freshItems: BriefingItem[] = [];
+): { datedFresh: BriefingItem[]; undated: BriefingItem[]; staleDropped: DroppedItem[] } {
+  const datedFresh: BriefingItem[] = [];
+  const undated: BriefingItem[] = [];
   const staleDropped: DroppedItem[] = [];
 
   for (const item of items) {
     const date = item.data_publicacao;
-    // Sem data ou formato inesperado → mantém (não temos como provar que é velho).
+    // Sem data ou formato inesperado → balde "undated" (preenchimento).
     if (!date || typeof date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
-      freshItems.push(item);
+      undated.push(item);
       continue;
     }
     // Comparação ISO string funciona porque YYYY-MM-DD ordena corretamente.
@@ -270,10 +299,10 @@ function filterByFreshness(
       staleDropped.push({ item, reason: `antigo (publicado em ${date}, cutoff ${cutoffISO})` });
       continue;
     }
-    freshItems.push(item);
+    datedFresh.push(item);
   }
 
-  return { freshItems, staleDropped };
+  return { datedFresh, undated, staleDropped };
 }
 
 /**

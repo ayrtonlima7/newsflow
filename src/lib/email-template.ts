@@ -1,5 +1,5 @@
 import type { Briefing } from './types';
-import { HTML_LANG, type Locale } from './i18n';
+import { HTML_LANG, INTL_LOCALE, type Locale } from './i18n';
 
 /** Strings fixas do email (chrome) por idioma. O conteúdo (assunto/intro/corpo)
  *  já vem traduzido do briefing; aqui é só a moldura. */
@@ -46,6 +46,23 @@ function esc(s: string): string {
     .replace(/"/g, '&quot;');
 }
 
+/**
+ * Formata a data de publicação (YYYY-MM-DD) pro idioma do leitor. Retorna ''
+ * quando a data está ausente/inválida (não renderiza nada nesse caso — melhor
+ * sem data do que "Invalid Date"). Usa timeZone UTC pra não deslocar o dia.
+ */
+export function formatItemDate(date: string | undefined, locale: Locale): string {
+  if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return '';
+  const d = new Date(`${date}T00:00:00Z`);
+  if (Number.isNaN(d.getTime())) return '';
+  return new Intl.DateTimeFormat(INTL_LOCALE[locale], {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    timeZone: 'UTC',
+  }).format(d);
+}
+
 /** Converte quebras de linha simples do corpo em parágrafos/quebras HTML. */
 function corpoToHtml(corpo: string): string {
   return esc(corpo.trim()).replace(/\n{2,}/g, '</p><p style="margin:0 0 12px 0;">').replace(/\n/g, '<br>');
@@ -67,13 +84,16 @@ export function renderEmailHtml(briefing: Briefing, locale: Locale = 'pt'): stri
     .map((item) => {
       const titulo = esc(item.titulo);
       const fonte = esc(item.fonte);
+      const data = formatItemDate(item.data_publicacao, locale);
+      // fonte · data (a data só aparece quando válida)
+      const meta = data ? `${fonte} &middot; ${esc(data)}` : fonte;
       const url = item.url; // já validada
       return `
       <div style="margin:0 0 28px 0;padding:0 0 28px 0;border-bottom:1px solid #ececec;">
         <h2 style="margin:0 0 8px 0;font-size:18px;line-height:1.35;font-weight:600;">
           <a href="${url}" style="color:#1a1a1a;text-decoration:none;" target="_blank" rel="noopener">${titulo}</a>
         </h2>
-        <p style="margin:0 0 8px 0;font-size:12px;color:#8a8a8a;text-transform:uppercase;letter-spacing:0.04em;">${fonte}</p>
+        <p style="margin:0 0 8px 0;font-size:12px;color:#8a8a8a;text-transform:uppercase;letter-spacing:0.04em;">${meta}</p>
         <p style="margin:0 0 12px 0;font-size:15px;line-height:1.65;color:#333;">${corpoToHtml(item.corpo)}</p>
         <a href="${url}" style="font-size:14px;color:#2563eb;text-decoration:none;" target="_blank" rel="noopener">${t.readSource}</a>
       </div>`;

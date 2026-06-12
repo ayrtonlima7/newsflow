@@ -2,7 +2,7 @@ import { Resend } from 'resend';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { generateBriefing, generateEmail } from './pipeline';
 import { canDeliver, type SubscriptionStatus } from './subscription';
-import type { Profile } from './types';
+import { frequenciaParaJanela, type Profile } from './types';
 
 export interface DeliveryInput {
   userId: string;
@@ -88,7 +88,34 @@ export async function runDeliveryPipeline(
       }
     }
 
-    const { briefing, meta: curateMeta } = await generateBriefing(input.profile);
+    // --- Dedup entre entregas: junta as URLs que o usuário já recebeu nas edições
+    //     dentro da janela de frescor (URLs mais antigas que isso não reapareceriam
+    //     de qualquer forma, o frescor as cortaria). Falha-segura: erro aqui só
+    //     desliga o dedup, não derruba a entrega. ---
+    const janela = frequenciaParaJanela(input.profile.frequencia);
+    const sinceISO = new Date(Date.now() - janela.janelaDias * 86_400_000).toISOString();
+    const excludeUrls = new Set<string>();
+    try {
+      const { data: recentes } = await supabase
+        .from('briefings')
+        .select('itens')
+        .eq('user_id', input.userId)
+        .gte('created_at', sinceISO)
+        .order('created_at', { ascending: false })
+        .limit(10);
+      for (const b of recentes ?? []) {
+        for (const it of (b.itens ?? []) as Array<{ url?: string }>) {
+          if (it?.url) excludeUrls.add(it.url);
+        }
+      }
+      if (excludeUrls.size > 0) {
+        console.log(`[delivery] dedup: ${excludeUrls.size} URL(s) recentes a evitar (user ${input.userId})`);
+      }
+    } catch (e) {
+      console.warn('[delivery] dedup: falha ao buscar URLs recentes, seguindo sem dedup:', e);
+    }
+
+    const { briefing, meta: curateMeta } = await generateBriefing(input.profile, { excludeUrls });
     costBrl += curateMeta.cost.totalBRL;
 
     const { data: briefingRow, error: bErr } = await supabase

@@ -12,3 +12,5 @@ next-env.d.ts
 .idea/
 tsconfig.tsbuildinfo
 .claude/scheduled_tasks.lock
+.vercel
+.env*

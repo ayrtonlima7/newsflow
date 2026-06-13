@@ -49,3 +49,27 @@ describe('renderEmailHtml — data', () => {
     expect(html).not.toContain('&middot;');
   });
 });
+
+describe('renderEmailHtml — tema', () => {
+  const base: Briefing = { data_referencia: '2026-06-12', assunto: 'A', intro: 'Oi', itens: [] };
+
+  it('light é o default (fundo slate-50)', () => {
+    const html = renderEmailHtml(base, 'pt');
+    expect(html).toContain('background:#F8FAFC');
+    expect(html).not.toContain('background:#0F172A');
+  });
+
+  it('theme:dark usa fundo slate-900 e card slate-800', () => {
+    const html = renderEmailHtml(base, 'pt', { theme: 'dark' });
+    expect(html).toContain('background:#0F172A');
+    expect(html).toContain('#1E293B');
+  });
+
+  it('os dois temas mantêm o header de marca (gradiente indigo + wordmark)', () => {
+    for (const theme of ['light', 'dark'] as const) {
+      const html = renderEmailHtml(base, 'pt', { theme });
+      expect(html).toContain('linear-gradient(135deg,#312E81,#4F46E5)');
+      expect(html).toContain('NewsFlow');
+    }
+  });
+});

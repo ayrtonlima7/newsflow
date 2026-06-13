@@ -27,8 +27,16 @@ async function main() {
     process.exit(0);
   }
 
+  // Tema opcional pra preview: `npm run email -- briefing.json dark`. Sem isso,
+  // cai no env EMAIL_THEME → 'light' (produção).
+  const theme = process.argv.includes('dark')
+    ? 'dark'
+    : process.argv.includes('light')
+      ? 'light'
+      : undefined;
+
   const assunto = briefing.assunto?.trim() || 'Seu resumo de hoje';
-  const html = renderEmailHtml(briefing);
+  const html = renderEmailHtml(briefing, 'pt', theme ? { theme } : {});
 
   const latestDir = resolve(ROOT, 'output/emails/latest');
   await mkdir(latestDir, { recursive: true });

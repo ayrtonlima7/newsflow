@@ -6,6 +6,7 @@ import { SettingsForm } from './settings-form';
 import { SampleCard } from './sample-card';
 import { SubscriptionCard } from './subscription-card';
 import { DeliveryEmailCard } from './delivery-email-card';
+import { IdentifyUser } from '../_analytics/identify-user';
 import { canDeliver, type SubscriptionStatus } from '@/src/lib/subscription';
 import { getLocale } from '../_i18n/locale';
 import { getDictionary, translate } from '@/src/lib/messages';
@@ -62,6 +63,7 @@ export default async function SettingsPage({
 
   return (
     <main className="mx-auto flex min-h-screen max-w-2xl flex-col gap-8 px-6 py-16">
+      <IdentifyUser userId={user.id} email={user.email ?? undefined} />
       <div className="flex items-start justify-between gap-4">
         <div className="space-y-1">
           <p className="text-sm text-[var(--color-muted)]">{user.email}</p>

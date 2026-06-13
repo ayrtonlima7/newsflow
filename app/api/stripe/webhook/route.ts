@@ -3,6 +3,8 @@ import type Stripe from 'stripe';
 import { getStripe, planFromPriceId } from '@/lib/stripe/client';
 import { createAdminClient } from '@/lib/supabase/admin';
 import type { SubscriptionStatus } from '@/src/lib/subscription';
+import { trackServer } from '@/src/lib/analytics/server';
+import { ANALYTICS_EVENTS } from '@/src/lib/analytics/events';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -111,7 +113,19 @@ export async function POST(req: NextRequest) {
 
   try {
     switch (event.type) {
-      case 'customer.subscription.created':
+      case 'customer.subscription.created': {
+        const sub = event.data.object as Stripe.Subscription;
+        await syncSubscription(sub);
+        // Funil (fundo): assinatura criada. distinct_id = user.id pra cair na
+        // MESMA pessoa do funil client-side. No-op sem PostHog configurado.
+        const userId = sub.metadata?.user_id;
+        if (userId) {
+          await trackServer(userId, ANALYTICS_EVENTS.SUBSCRIBED, {
+            plan: planFromPriceId(sub.items.data[0]?.price?.id),
+          });
+        }
+        break;
+      }
       case 'customer.subscription.updated':
       case 'customer.subscription.deleted':
         await syncSubscription(event.data.object as Stripe.Subscription);

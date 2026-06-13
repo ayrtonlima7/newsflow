@@ -38,12 +38,12 @@ curl -H "Authorization: Bearer $CRON_SECRET" \
 
 Next.js 15 App Router + React 19 + Tailwind 4 + Supabase + Resend. **Search via Tavily, LLM via DeepSeek.** TS path alias `@/*` resolves to repo root.
 
-**External services (6 active):** Vercel (host) · Supabase (DB + auth) · Resend (email send + auth magic-link relay) · Tavily (web search) · DeepSeek (LLM) · cron-job.org (hourly cron, external). Gemini is dormant (key kept as fallback, not used). DeepSeek is **prepaid** (top-up balance) — if it hits zero, the pipeline fails (monitor it).
+**External services (6 active):** Vercel (host) · Supabase (DB + auth) · Resend (email send + auth magic-link relay) · Tavily (web search) · DeepSeek (LLM) · cron-job.org (hourly cron, external). Gemini is dormant (key kept as fallback, not used). DeepSeek is **prepaid** (top-up balance) — if it hits zero, the pipeline fails (monitor it). **PostHog** (analytics/funnel) is a 7th service but **dormant/env-gated** — code ships dark, activates only when `NEXT_PUBLIC_POSTHOG_KEY` is set (see Analytics below).
 
 ### Directory split
 
-- `app/` — Next routes, server actions, pages (`/login`, `/onboarding`, `/settings`, `/admin`, plus `app/api/*` and `app/auth/confirm`). `app/api/dev/preview/[id]` serves delivery HTML in dev only.
-- `src/` — non-Next code: `cli/` scripts, `prompts/` (just `curate.ts`), `lib/` (pipeline, delivery, providers, **search**, **email-template**, types, pricing, url-validation, topic-normalization, domain-derivation, admin-stats).
+- `app/` — Next routes, server actions, pages (`/login`, `/onboarding`, `/settings`, `/admin`, plus `app/api/*` and `app/auth/confirm`). `app/api/dev/preview/[id]` serves delivery HTML in dev only. `app/_analytics/` holds the client analytics provider + identify component (see Analytics).
+- `src/` — non-Next code: `cli/` scripts, `prompts/` (just `curate.ts`), `lib/` (pipeline, delivery, providers, **search**, **email-template**, types, pricing, url-validation, topic-normalization, domain-derivation, admin-stats, **analytics/**).
 - `lib/supabase/` — three Supabase clients (browser, server-RSC, admin/service-role). Path is `@/lib/supabase/...`.
 - `supabase/migrations/` — SQL migrations applied manually via Supabase SQL editor. `supabase/scripts/` — one-off SQL (e.g. reset).
 - `fixtures/` — sample profile JSON for local CLI runs.
@@ -126,6 +126,16 @@ Supabase Auth via `@supabase/ssr`. **Login is unified on the home page (`/`)** �
 ### Feedback & unsubscribe
 
 The email contains `{{FEEDBACK_URL_YES}}` / `{{FEEDBACK_URL_NO}}` placeholders replaced just before send. `/api/feedback?id=&v=up|down` updates `deliveries.feedback`. `/api/unsubscribe?id=` supports both GET (HTML confirmation page) and POST (RFC 8058 one-click from Gmail/Outlook) and sets `profiles.is_active=false`.
+
+### Analytics / funil (PostHog) — **env-gated, ships dark**
+
+Acquisition-funnel instrumentation for an ad smoke test ("how far do people get?"). **Full guide: `docs/ANALYTICS.md`.** The whole thing is **no-op without `NEXT_PUBLIC_POSTHOG_KEY`** — it ships inert and activates by setting the env (no code change). Never blocks the app (all calls in try/catch).
+
+- **Module:** `src/lib/analytics/` — `events.ts` (the typed event catalog = source of truth; edit here to change the funnel), `track.ts` (client `track()`/`identifyUser()`/`resetUser()`), `server.ts` (`trackServer()` via HTTP for server events, no posthog-node dep). `app/_analytics/` — `analytics-provider.tsx` (PostHog init + manual `$pageview` on route change + optional Meta/Google ad pixels, all env-gated; mounted in `layout.tsx`) and `identify-user.tsx` (mounted on authed pages).
+- **Funnel events:** `signup_started` (login-form) → `onboarding_started` + `onboarding_step` (wizard) → `onboarding_completed` (confirm-card) → `paywall_view` + `checkout_started` (subscription-card) → `subscribed` (webhook, **server**). Always import names from `ANALYTICS_EVENTS`, never raw strings. `onboarding_step` is keyed by **`question_id`** (not index — conditional questions shift the index) → that's the drop-off-by-question signal.
+- **`identify` is load-bearing:** `IdentifyUser` runs on every authed page (`/onboarding`, `/settings`) with `user.id` from the server — without it the funnel severs at login (anon vs identified treated as 2 people). The server `subscribed` event uses the same `user.id` as `distinct_id` so it lands on the same person.
+- **Envs (all optional):** `NEXT_PUBLIC_POSTHOG_KEY` (public `phc_...`), `NEXT_PUBLIC_POSTHOG_HOST` (us/eu), `NEXT_PUBLIC_META_PIXEL_ID`, `NEXT_PUBLIC_GOOGLE_ADS_ID`.
+- **Known limits:** magic-link cross-device under-counts `signup` (prefer Google OAuth during tests); adblockers eat events (data is directional); no `reset()` on logout yet; `subscribed` only fires once Stripe is live (use `checkout_started` as end-of-funnel meanwhile).
 
 ## Conventions
 

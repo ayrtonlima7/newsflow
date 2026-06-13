@@ -3,6 +3,8 @@
 import { useActionState, useState } from 'react';
 import { requestMagicLink, signInWithGoogle, type LoginState } from './actions';
 import { useT } from '../_i18n/provider';
+import { track } from '@/src/lib/analytics/track';
+import { ANALYTICS_EVENTS } from '@/src/lib/analytics/events';
 
 const initial: LoginState = { status: 'idle' };
 const IS_DEV = process.env.NODE_ENV === 'development';
@@ -57,6 +59,7 @@ export function LoginForm({ next }: { next?: string }) {
         <input type="hidden" name="next" value={next ?? '/onboarding'} />
         <button
           type="submit"
+          onClick={() => track(ANALYTICS_EVENTS.SIGNUP_STARTED, { method: 'google' })}
           className="flex w-full items-center justify-center gap-3 rounded-md border border-[var(--color-border)] bg-white px-6 py-3 text-sm font-medium text-[var(--color-fg)] transition hover:bg-stone-50"
         >
           <GoogleIcon />
@@ -110,6 +113,7 @@ export function LoginForm({ next }: { next?: string }) {
             <button
               type="submit"
               disabled={pending}
+              onClick={() => track(ANALYTICS_EVENTS.SIGNUP_STARTED, { method: 'email' })}
               className="w-full rounded-md bg-[var(--color-accent)] px-6 py-3 text-sm font-medium text-[var(--color-accent-fg)] transition hover:opacity-90 disabled:opacity-50"
             >
               {pending ? (IS_DEV ? 'Entrando…' : t('login.sending')) : IS_DEV ? 'Entrar (dev)' : t('login.sendMagic')}

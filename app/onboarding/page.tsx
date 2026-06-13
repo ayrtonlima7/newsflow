@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { OnboardingWizard } from './wizard';
+import { IdentifyUser } from '../_analytics/identify-user';
 import { getLocale } from '../_i18n/locale';
 import { getDictionary, translate } from '@/src/lib/messages';
 
@@ -26,6 +27,7 @@ export default async function OnboardingPage() {
 
   return (
     <main className="mx-auto flex min-h-screen max-w-2xl flex-col gap-8 px-6 py-16">
+      <IdentifyUser userId={user.id} email={user.email ?? undefined} />
       <div className="space-y-2">
         <p className="text-sm font-medium uppercase tracking-wider text-[var(--color-muted)]">
           NewsFlow AI

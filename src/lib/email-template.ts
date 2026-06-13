@@ -89,16 +89,19 @@ export function renderEmailHtml(briefing: Briefing, locale: Locale = 'pt'): stri
       const meta = data ? `${fonte} &middot; ${esc(data)}` : fonte;
       const url = item.url; // já validada
       return `
-      <div style="margin:0 0 28px 0;padding:0 0 28px 0;border-bottom:1px solid #ececec;">
+      <div style="margin:0 0 28px 0;padding:0 0 28px 0;border-bottom:1px solid #E2E8F0;">
         <h2 style="margin:0 0 8px 0;font-size:18px;line-height:1.35;font-weight:600;">
-          <a href="${url}" style="color:#1a1a1a;text-decoration:none;" target="_blank" rel="noopener">${titulo}</a>
+          <a href="${url}" style="color:#0F172A;text-decoration:none;" target="_blank" rel="noopener">${titulo}</a>
         </h2>
-        <p style="margin:0 0 8px 0;font-size:12px;color:#8a8a8a;text-transform:uppercase;letter-spacing:0.04em;">${meta}</p>
-        <p style="margin:0 0 12px 0;font-size:15px;line-height:1.65;color:#333;">${corpoToHtml(item.corpo)}</p>
-        <a href="${url}" style="font-size:14px;color:#2563eb;text-decoration:none;" target="_blank" rel="noopener">${t.readSource}</a>
+        <p style="margin:0 0 10px 0;font-size:12px;color:#64748B;text-transform:uppercase;letter-spacing:0.04em;">${meta}</p>
+        <p style="margin:0 0 14px 0;font-size:15px;line-height:1.65;color:#334155;">${corpoToHtml(item.corpo)}</p>
+        <a href="${url}" style="font-size:14px;font-weight:600;color:#4F46E5;text-decoration:none;" target="_blank" rel="noopener">${t.readSource}</a>
       </div>`;
     })
     .join('\n');
+
+  // Data da edição no header (formato amigável; vazio se ausente/inválida).
+  const headerDate = formatItemDate(briefing.data_referencia, locale);
 
   return `<!DOCTYPE html>
 <html lang="${HTML_LANG[locale]}">
@@ -107,19 +110,35 @@ export function renderEmailHtml(briefing: Briefing, locale: Locale = 'pt'): stri
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>${esc(briefing.assunto ?? t.titleFallback)}</title>
 </head>
-<body style="margin:0;padding:0;background:#f5f5f4;">
+<body style="margin:0;padding:0;background:#F8FAFC;">
   <div style="max-width:600px;margin:0 auto;padding:32px 20px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
-    <div style="background:#ffffff;border-radius:12px;padding:32px 28px;">
-      ${intro ? `<p style="margin:0 0 28px 0;font-size:16px;line-height:1.6;color:#1a1a1a;">${corpoToHtml(intro)}</p>` : ''}
-      ${itemsHtml}
+    <div style="border-radius:14px;overflow:hidden;border:1px solid #E2E8F0;background:#ffffff;">
+      <!-- Header de marca: gradiente indigo (cor sólida de fallback p/ clients sem gradient) -->
+      <div style="background-color:#4F46E5;background-image:linear-gradient(135deg,#312E81,#4F46E5);padding:22px 28px;">
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
+          <tr>
+            <td style="vertical-align:middle;">
+              <span style="display:inline-block;width:34px;height:34px;line-height:34px;text-align:center;background:#ffffff;border-radius:9px;color:#4F46E5;font-size:20px;font-weight:700;vertical-align:middle;">N</span>
+              <span style="margin-left:10px;font-size:20px;font-weight:700;color:#ffffff;letter-spacing:-0.02em;vertical-align:middle;">NewsFlow</span>
+            </td>
+            ${headerDate ? `<td style="vertical-align:middle;text-align:right;font-size:13px;color:#E0E7FF;">${esc(headerDate)}</td>` : ''}
+          </tr>
+        </table>
+      </div>
 
-      <div style="margin-top:8px;text-align:center;">
-        <p style="margin:0 0 12px 0;font-size:14px;color:#555;">${t.helpful}</p>
-        <a href="{{FEEDBACK_URL_YES}}" style="display:inline-block;margin:0 6px;padding:8px 18px;border-radius:8px;background:#16a34a;color:#fff;text-decoration:none;font-size:14px;" target="_blank" rel="noopener">${t.yes}</a>
-        <a href="{{FEEDBACK_URL_NO}}" style="display:inline-block;margin:0 6px;padding:8px 18px;border-radius:8px;background:#dc2626;color:#fff;text-decoration:none;font-size:14px;" target="_blank" rel="noopener">${t.no}</a>
+      <!-- Conteúdo -->
+      <div style="padding:32px 28px;">
+        ${intro ? `<p style="margin:0 0 28px 0;font-size:16px;line-height:1.6;color:#0F172A;">${corpoToHtml(intro)}</p>` : ''}
+        ${itemsHtml}
+
+        <div style="margin-top:8px;text-align:center;">
+          <p style="margin:0 0 12px 0;font-size:14px;color:#64748B;">${t.helpful}</p>
+          <a href="{{FEEDBACK_URL_YES}}" style="display:inline-block;margin:0 6px;padding:9px 20px;border-radius:8px;background:#059669;color:#fff;text-decoration:none;font-size:14px;font-weight:600;" target="_blank" rel="noopener">${t.yes}</a>
+          <a href="{{FEEDBACK_URL_NO}}" style="display:inline-block;margin:0 6px;padding:9px 20px;border-radius:8px;background:#DC2626;color:#fff;text-decoration:none;font-size:14px;font-weight:600;" target="_blank" rel="noopener">${t.no}</a>
+        </div>
       </div>
     </div>
-    <p style="margin:20px 0 0 0;text-align:center;font-size:12px;color:#a1a1aa;">
+    <p style="margin:20px 0 0 0;text-align:center;font-size:12px;color:#94A3B8;">
       ${t.footer}
     </p>
   </div>

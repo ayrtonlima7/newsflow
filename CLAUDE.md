@@ -112,7 +112,7 @@ On profile save (onboarding + settings), `deriveDomains(profile)` calls **DeepSe
 `app/api/cron/deliver/route.ts` requires `Authorization: Bearer $CRON_SECRET`. **The cron runs via cron-job.org** (external service, free, hits the endpoint every 30min with the Authorization header configured in its dashboard). It replaced GitHub Actions, which **silently dropped scheduled runs** (best-effort, unreliable). `vercel.json` has `crons: []` (no Vercel cron — Hobby caps at 1×/day). The GH Actions workflow (`.github/workflows/cron-deliver.yml`) still exists but should be disabled.
 
 `isDue()` logic:
-- **Hour match with ±1h tolerance** (cron-job.org + GH Actions can drift): user's `horario` matches if it's in `[currentSpHour+1, currentSpHour, currentSpHour-1]` (SP = UTC-3). `horario` parsed loosely (`08:00`, `8h`, `8` → 8).
+- **Hour match, on-time-or-late (never early)**: user's `horario` matches if it's in `[currentSpHour, currentSpHour-1]` (SP = UTC-3) — i.e. delivered at the target hour or up to 1h late if that run was missed, **never before**. (An earlier `+1` term fired 1h early — a 7h user got the email at 6h; removed.) `horario` parsed loosely (`08:00`, `8h`, `8` → 8).
 - **Idempotency by calendar period** (`alreadyDeliveredThisPeriod`): daily → already delivered same SP calendar day; 3-day → within 2.5 days; weekly → within 6 days. This is by PERIOD, not "X hours since last" — so a manual test yesterday doesn't block today's scheduled send.
 
 ⚠️ Known limits:

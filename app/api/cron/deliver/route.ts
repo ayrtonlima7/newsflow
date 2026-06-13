@@ -74,16 +74,15 @@ function isDue(
     return { due: false, reason: `horário inválido: "${profile.horario}"` };
   }
 
-  // Cron roda no minuto 45 UTC de cada hora via GitHub Actions, que pode
-  // atrasar 5-15min. Pra absorver isso, aceita janela de tolerância de ±1h:
-  // - currentSpHour + 1 (cron rodou no horário, prep pra próxima hora)
-  // - currentSpHour     (cron atrasou e tá na hora-alvo)
-  // - currentSpHour - 1 (cron atrasou muito; idempotência via last_delivered_at impede duplicata)
+  // O cron (cron-job.org) roda a cada 30min, então a hora-alvo é sempre captada.
+  // NUNCA adiantamos a entrega: disparamos na hora-alvo ou, no máximo, 1h DEPOIS
+  // (caso a rodada da hora-alvo tenha sido perdida). A idempotência por período
+  // impede duplicata. (Havia um `+1` que adiantava 1h — entregava o email de 7h
+  // às 6h; removido.)
   const currentSpHour = spHourNow(now);
   const tolerantHours = [
-    (currentSpHour + 1) % 24,
-    currentSpHour,
-    (currentSpHour + 24 - 1) % 24,
+    currentSpHour, // na hora-alvo
+    (currentSpHour + 24 - 1) % 24, // 1h atrasado (rodada anterior perdida)
   ];
   if (!tolerantHours.includes(targetHour)) {
     return {

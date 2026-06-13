@@ -26,6 +26,9 @@ export async function trackServer<E extends AnalyticsEventName>(
 ): Promise<void> {
   if (!KEY || !distinctId) return;
   try {
+    // `await` é necessário em serverless (sem ele a função pode encerrar antes
+    // do fetch sair). Mas um PostHog lento NÃO pode segurar o 200 pro Stripe —
+    // por isso o timeout curto: estourou, aborta e o webhook segue.
     await fetch(`${HOST}/capture/`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -35,10 +38,10 @@ export async function trackServer<E extends AnalyticsEventName>(
         distinct_id: distinctId,
         properties: { ...properties, $lib: 'newsflow-server' },
       }),
-      // não bloqueia o webhook se o PostHog estiver lento
       cache: 'no-store',
+      signal: AbortSignal.timeout(2500),
     });
   } catch {
-    // ignora — telemetria nunca derruba o webhook
+    // ignora (inclui timeout) — telemetria nunca derruba/atrasa o webhook
   }
 }

@@ -96,6 +96,11 @@ https://trynewsflow.com/?utm_source=meta&utm_medium=cpc&utm_campaign=smoke-test-
   aparelho, aquela sessão é um novo anônimo que não costura com a visita da
   landing → `landing → signup` **subconta** pra quem usa email. Durante o teste,
   prefira destacar o **Google OAuth** (mesmo browser, costura certo).
+- **`signup_started` dispara logo antes de navegar pra fora** (OAuth do Google /
+  envio do magic-link). O PostHog tenta dar flush via `sendBeacon` no
+  `pagehide`, mas em redirect imediato o evento pode não sair → `signup_started`
+  pode **subcontar**. Trate a queda landing→signup como direcional, não como
+  abandono real.
 - **Adblockers** comem parte dos eventos do PostHog-cloud e dos pixels → dados
   são **direcionais**, não exatos. Suficiente pra smoke test; não trate como censo.
 - **`person_profiles: 'identified_only'`** — só cria perfil de pessoa após o

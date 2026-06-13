@@ -1,11 +1,13 @@
 'use client';
 
-import { useMemo, useState, useTransition } from 'react';
+import { useEffect, useMemo, useState, useTransition } from 'react';
 import { getQuestions, isQuestionShown, type QuestionId } from './questions';
 import { StepCard } from './step-card';
 import { ConfirmCard } from './confirm-card';
 import { generateTopicSuggestions } from './actions';
 import { useT, useLocale } from '../_i18n/provider';
+import { track } from '@/src/lib/analytics/track';
+import { ANALYTICS_EVENTS } from '@/src/lib/analytics/events';
 import type { Profile } from '@/src/lib/types';
 
 type Answers = {
@@ -68,6 +70,30 @@ export function OnboardingWizard({ userEmail }: { userEmail: string }) {
   const currentValue = currentQuestion
     ? (answers as Record<string, string | string[]>)[currentQuestion.id]
     : '';
+
+  // --- Analytics do funil ---
+  // Abriu o wizard (uma vez por montagem).
+  useEffect(() => {
+    track(ANALYTICS_EVENTS.ONBOARDING_STARTED);
+  }, []);
+
+  // Chegou em CADA pergunta — keyado por question_id (não por índice, porque há
+  // perguntas condicionais). É isto que desenha a curva de drop-off por
+  // pergunta. Não dispara na tela de confirmação (currentQuestion === null).
+  const currentQuestionId = currentQuestion?.id;
+  useEffect(() => {
+    if (!currentQuestionId) return;
+    const idx = visibleQuestions.findIndex((q) => q.id === currentQuestionId);
+    if (idx < 0) return;
+    track(ANALYTICS_EVENTS.ONBOARDING_STEP, {
+      question_id: currentQuestionId,
+      position: idx + 1,
+      total_visible: visibleQuestions.length,
+    });
+    // só re-dispara quando MUDA de pergunta; visibleQuestions muda de identidade
+    // a cada render, então fica fora das deps de propósito.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentQuestionId]);
 
   function updateAnswer(value: string | string[]) {
     if (!currentQuestion) return;

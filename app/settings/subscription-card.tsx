@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useEffect, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   createCheckoutSession,
@@ -9,6 +9,8 @@ import {
 } from './subscription-actions';
 import { useT, useLocale } from '../_i18n/provider';
 import { INTL_LOCALE } from '@/src/lib/i18n';
+import { track } from '@/src/lib/analytics/track';
+import { ANALYTICS_EVENTS } from '@/src/lib/analytics/events';
 import type { GateResult } from '@/src/lib/subscription';
 
 interface Props {
@@ -39,6 +41,14 @@ export function SubscriptionCard({
   const [showCoupon, setShowCoupon] = useState(false);
   const [coupon, setCoupon] = useState('');
 
+  // Viu os planos (paywall). Só os estados free/canceled renderizam os botões
+  // de assinar — é aí que conta como "viu o paywall".
+  useEffect(() => {
+    if (gateState === 'free' || gateState === 'canceled') {
+      track(ANALYTICS_EVENTS.PAYWALL_VIEW, { gate_state: gateState });
+    }
+  }, [gateState]);
+
   const priceMonthly = t('sub.priceMonthly');
   const priceAnnual = t('sub.priceAnnual');
   const fmtDate = (iso: string) =>
@@ -46,6 +56,7 @@ export function SubscriptionCard({
 
   function goCheckout(p: 'mensal' | 'anual') {
     setError(null);
+    track(ANALYTICS_EVENTS.CHECKOUT_STARTED, { plan: p });
     startTransition(async () => {
       const res = await createCheckoutSession(p);
       if (res.url) window.location.href = res.url;

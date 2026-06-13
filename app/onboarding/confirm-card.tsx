@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation';
 import { saveProfile } from './actions';
 import { useT, useLocale } from '../_i18n/provider';
 import { contextoLabel, frequenciaLabel } from '@/src/lib/onboarding-options';
+import { track } from '@/src/lib/analytics/track';
+import { ANALYTICS_EVENTS } from '@/src/lib/analytics/events';
 import type { Profile } from '@/src/lib/types';
 
 export function ConfirmCard({
@@ -23,6 +25,12 @@ export function ConfirmCard({
   async function handleConfirm() {
     setSaving(true);
     setError(null);
+    // Fundo do onboarding — dispara ANTES do save (que redireciona em caso de
+    // sucesso e não retorna).
+    track(ANALYTICS_EVENTS.ONBOARDING_COMPLETED, {
+      frequencia: profile.frequencia || '',
+      n_topicos: profile.topicos.length,
+    });
     const result = await saveProfile(profile);
     if (result && !result.ok) {
       setError(result.error ?? 'erro ao salvar');

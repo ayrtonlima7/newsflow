@@ -24,7 +24,9 @@ export function SampleCard({ userEmail, sampleCooldownUntil }: Props) {
 
   const untilMs = sampleCooldownUntil ? new Date(sampleCooldownUntil).getTime() : 0;
   const cooldownRemaining = untilMs ? Math.max(0, untilMs - now) : 0;
-  const onCooldown = cooldownRemaining > 0;
+  // Em DEV (local) o cooldown não bloqueia o botão — facilita testar gerações
+  // seguidas. Em produção, o cooldown por frequência vale normalmente.
+  const onCooldown = !IS_DEV && cooldownRemaining > 0;
 
   useEffect(() => {
     if (!onCooldown) return;

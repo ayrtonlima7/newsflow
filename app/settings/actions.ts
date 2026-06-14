@@ -142,7 +142,8 @@ export async function sendSampleNow(): Promise<SampleResult> {
   // Cooldown segue a frequência do perfil (gravado em sample_cooldown_until na
   // última geração — travado naquele momento, mudar a frequência depois não
   // encurta). Coluna ausente (migration não aplicada) → undefined → sem cooldown.
-  if (profileRow.sample_cooldown_until) {
+  // Em DEV (local) o cooldown é ignorado pra facilitar testes.
+  if (process.env.NODE_ENV !== 'development' && profileRow.sample_cooldown_until) {
     const remainingMs = new Date(profileRow.sample_cooldown_until).getTime() - Date.now();
     if (remainingMs > 0) {
       return {

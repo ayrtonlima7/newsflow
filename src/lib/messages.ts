@@ -84,6 +84,8 @@ const pt: Dictionary = {
   // settings (página + form)
   'settings.title': 'Seu perfil',
   'settings.subtitle': 'Edite o que quiser e clique em salvar. A curadoria considera essas configurações no próximo envio.',
+  'settings.contactTitle': 'Fale com a gente',
+  'settings.contactBody': 'Críticas, sugestões, dúvidas ou problemas? A gente adora ouvir. Escreva pra',
   'settings.admin': 'Admin',
   'settings.signOut': 'Sair',
   'settings.welcomeAllowed': '✓ Perfil salvo! O primeiro email vai chegar na frequência que você escolheu — ou clique abaixo pra receber um exemplo agora.',
@@ -224,6 +226,8 @@ const en: Dictionary = {
 
   'settings.title': 'Your profile',
   'settings.subtitle': 'Edit whatever you like and hit save. Curation uses these settings on the next send.',
+  'settings.contactTitle': 'Talk to us',
+  'settings.contactBody': 'Feedback, suggestions, questions or issues? We love to hear it. Write to',
   'settings.admin': 'Admin',
   'settings.signOut': 'Sign out',
   'settings.welcomeAllowed': "✓ Profile saved! Your first email will arrive at the frequency you chose — or click below to get a sample now.",
@@ -361,6 +365,8 @@ const es: Dictionary = {
 
   'settings.title': 'Tu perfil',
   'settings.subtitle': 'Edita lo que quieras y pulsa guardar. La curaduría usa esta configuración en el próximo envío.',
+  'settings.contactTitle': 'Habla con nosotros',
+  'settings.contactBody': '¿Críticas, sugerencias, dudas o problemas? Nos encanta escuchar. Escríbenos a',
   'settings.admin': 'Admin',
   'settings.signOut': 'Salir',
   'settings.welcomeAllowed': '✓ ¡Perfil guardado! El primer email llegará en la frecuencia que elegiste — o pulsa abajo para recibir un ejemplo ahora.',

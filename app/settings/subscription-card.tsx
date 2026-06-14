@@ -134,7 +134,7 @@ export function SubscriptionCard({
           type="button"
           onClick={goPortal}
           disabled={pending}
-          className={`mt-3 rounded-md border bg-white px-4 py-2 text-sm transition disabled:opacity-50 ${tone.btn}`}
+          className={`mt-3 rounded-md border bg-[var(--color-surface)] px-4 py-2 text-sm transition disabled:opacity-50 ${tone.btn}`}
         >
           {pending ? t('sub.opening') : canceling ? t('sub.reactivate') : t('sub.manage')}
         </button>
@@ -156,14 +156,14 @@ export function SubscriptionCard({
   // --- Past due → atualizar pagamento ---
   if (gateState === 'past_due') {
     return (
-      <div className="rounded-lg border border-[var(--color-border)] bg-white p-5">
+      <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-5">
         <p className="text-sm font-medium">{t('sub.pastDueTitle')}</p>
         <p className="mt-1 text-xs text-[var(--color-muted)]">{t('sub.pastDueBody')}</p>
         <button
           type="button"
           onClick={goPortal}
           disabled={pending}
-          className="mt-3 rounded-md bg-[var(--color-fg)] px-4 py-2 text-sm text-white transition hover:opacity-90 disabled:opacity-50"
+          className="mt-3 rounded-md bg-[var(--color-accent)] px-4 py-2 text-sm text-[var(--color-accent-fg)] transition hover:opacity-90 disabled:opacity-50"
         >
           {pending ? t('sub.opening') : t('sub.updatePayment')}
         </button>
@@ -177,7 +177,7 @@ export function SubscriptionCard({
   const subtitle = gateState === 'canceled' ? t('sub.canceledSub') : t('sub.startSub');
 
   return (
-    <div className="rounded-lg border border-[var(--color-border)] bg-white p-5">
+    <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-5">
       <p className="text-sm font-medium">{headline}</p>
       <p className="mt-1 text-xs text-[var(--color-muted)]">{subtitle}</p>
 
@@ -186,7 +186,7 @@ export function SubscriptionCard({
           type="button"
           onClick={() => goCheckout('mensal')}
           disabled={pending}
-          className="flex-1 rounded-md border border-[var(--color-border)] bg-white px-4 py-3 text-sm transition hover:border-[var(--color-fg)] disabled:opacity-50"
+          className="flex-1 rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-3 text-sm transition hover:border-[var(--color-fg)] disabled:opacity-50"
         >
           <span className="block font-medium">{t('sub.planMonthly')}</span>
           <span className="text-xs text-[var(--color-muted)]">{t('sub.btnSubTrial', { price: priceMonthly })}</span>
@@ -195,7 +195,7 @@ export function SubscriptionCard({
           type="button"
           onClick={() => goCheckout('anual')}
           disabled={pending}
-          className="flex-1 rounded-md border-2 border-[var(--color-fg)] bg-[var(--color-fg)] px-4 py-3 text-sm text-white transition hover:opacity-90 disabled:opacity-50"
+          className="flex-1 rounded-md border-2 border-[var(--color-accent)] bg-[var(--color-accent)] px-4 py-3 text-sm text-[var(--color-accent-fg)] transition hover:opacity-90 disabled:opacity-50"
         >
           <span className="block font-medium">{t('sub.btnAnnual')}</span>
           <span className="text-xs opacity-80">{t('sub.btnSubTrial', { price: priceAnnual })}</span>
@@ -232,7 +232,7 @@ export function SubscriptionCard({
               type="button"
               onClick={goRedeem}
               disabled={pending || !coupon.trim()}
-              className="rounded-md border border-[var(--color-fg)] bg-white px-4 py-2 text-sm transition hover:bg-[var(--color-fg)] hover:text-white disabled:opacity-50"
+              className="rounded-md border border-[var(--color-fg)] bg-[var(--color-surface)] px-4 py-2 text-sm transition hover:bg-[var(--color-accent)] hover:text-[var(--color-accent-fg)] disabled:opacity-50"
             >
               {pending ? t('sub.redeeming') : t('sub.redeem')}
             </button>

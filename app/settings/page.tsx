@@ -74,7 +74,7 @@ export default async function SettingsPage({
           {isAdmin && (
             <Link
               href="/admin"
-              className="rounded-md border border-[var(--color-fg)] bg-[var(--color-fg)] px-4 py-2 text-sm text-white transition hover:opacity-90"
+              className="rounded-md border border-[var(--color-accent)] bg-[var(--color-accent)] px-4 py-2 text-sm text-[var(--color-accent-fg)] transition hover:opacity-90"
             >
               {t('settings.admin')}
             </Link>
@@ -82,7 +82,7 @@ export default async function SettingsPage({
           <form action={signOut}>
             <button
               type="submit"
-              className="rounded-md border border-[var(--color-border)] bg-white px-4 py-2 text-sm hover:border-[var(--color-fg)]"
+              className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-2 text-sm hover:border-[var(--color-fg)]"
             >
               {t('settings.signOut')}
             </button>

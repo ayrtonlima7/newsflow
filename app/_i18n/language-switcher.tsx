@@ -32,7 +32,7 @@ export function LanguageSwitcher() {
       onChange={onChange}
       disabled={pending}
       aria-label="Idioma / Language / Idioma"
-      className="cursor-pointer rounded-md border border-[var(--color-border)] bg-white/90 px-2 py-1 text-xs shadow-sm backdrop-blur transition hover:border-[var(--color-fg)] disabled:opacity-50"
+      className="cursor-pointer rounded-md border border-[var(--color-border)] bg-[var(--color-surface)]/90 px-2 py-1 text-xs shadow-sm backdrop-blur transition hover:border-[var(--color-fg)] disabled:opacity-50"
     >
       {LOCALES.map((l) => (
         <option key={l} value={l}>

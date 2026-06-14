@@ -35,8 +35,16 @@ async function main() {
       ? 'light'
       : undefined;
 
+  // Locale opcional (chrome do email: datas, "Ler na fonte", rodapé):
+  // `npm run email -- briefing.json light en`. Default 'pt'.
+  const locale = process.argv.includes('en')
+    ? 'en'
+    : process.argv.includes('es')
+      ? 'es'
+      : 'pt';
+
   const assunto = briefing.assunto?.trim() || 'Seu resumo de hoje';
-  const html = renderEmailHtml(briefing, 'pt', theme ? { theme } : {});
+  const html = renderEmailHtml(briefing, locale, theme ? { theme } : {});
 
   const latestDir = resolve(ROOT, 'output/emails/latest');
   await mkdir(latestDir, { recursive: true });

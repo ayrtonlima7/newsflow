@@ -48,7 +48,7 @@ export function ConfirmCard({
         <p className="text-sm text-[var(--color-muted)]">{t('confirm.subtitle')}</p>
       </div>
 
-      <dl className="space-y-4 rounded-lg border border-[var(--color-border)] bg-white p-6 text-sm">
+      <dl className="space-y-4 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-6 text-sm">
         <Row label={t('confirm.name')}>{profile.nome || <Empty />}</Row>
         <Row label={t('confirm.theme')}>
           <ChipList items={profile.tema} />
@@ -106,7 +106,7 @@ export function ConfirmCard({
           type="button"
           onClick={onEdit}
           disabled={saving}
-          className="inline-flex items-center justify-center rounded-md border border-[var(--color-border)] bg-white px-6 py-3 text-sm font-medium transition hover:border-[var(--color-fg)] disabled:opacity-50"
+          className="inline-flex items-center justify-center rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-6 py-3 text-sm font-medium transition hover:border-[var(--color-fg)] disabled:opacity-50"
         >
           {t('confirm.backEdit')}
         </button>
@@ -137,8 +137,8 @@ function ChipList({ items, muted }: { items: string[]; muted?: boolean }) {
           key={item}
           className={
             muted
-              ? 'rounded-full bg-stone-100 px-3 py-0.5 text-xs text-[var(--color-muted)] font-normal'
-              : 'rounded-full bg-stone-100 px-3 py-0.5 text-xs font-normal'
+              ? 'rounded-full bg-[var(--color-surface-2)] px-3 py-0.5 text-xs text-[var(--color-muted)] font-normal'
+              : 'rounded-full bg-[var(--color-surface-2)] px-3 py-0.5 text-xs font-normal'
           }
         >
           {item}

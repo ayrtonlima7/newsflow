@@ -57,7 +57,7 @@ export function SampleCard({ userEmail, lastDeliveredAt }: Props) {
 
   return (
     <div className="space-y-4">
-      <div className="rounded-lg border border-[var(--color-border)] bg-white p-5">
+      <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-5">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div className="space-y-1">
             <p className="text-sm font-medium">{t('sample.title')}</p>
@@ -70,7 +70,7 @@ export function SampleCard({ userEmail, lastDeliveredAt }: Props) {
             type="button"
             onClick={handleClick}
             disabled={pending || onCooldown}
-            className="shrink-0 rounded-md bg-[var(--color-fg)] px-4 py-2 text-sm text-white transition hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="shrink-0 rounded-md bg-[var(--color-accent)] px-4 py-2 text-sm text-[var(--color-accent-fg)] transition hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {buttonLabel}
           </button>
@@ -113,7 +113,7 @@ export function SampleCard({ userEmail, lastDeliveredAt }: Props) {
           <iframe
             src={`/api/dev/preview/${result.deliveryId}`}
             title="Preview do email"
-            className="h-[600px] w-full rounded border border-stone-300 bg-white"
+            className="h-[600px] w-full rounded border border-[var(--color-border)] bg-[var(--color-surface)]"
           />
         </div>
       )}

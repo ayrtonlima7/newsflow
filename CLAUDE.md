@@ -137,6 +137,15 @@ Acquisition-funnel instrumentation for an ad smoke test ("how far do people get?
 - **Envs (all optional):** `NEXT_PUBLIC_POSTHOG_KEY` (public `phc_...`), `NEXT_PUBLIC_POSTHOG_HOST` (us/eu), `NEXT_PUBLIC_META_PIXEL_ID`, `NEXT_PUBLIC_GOOGLE_ADS_ID`.
 - **Known limits:** magic-link cross-device under-counts `signup` (prefer Google OAuth during tests); adblockers eat events (data is directional); no `reset()` on logout yet; `subscribed` only fires once Stripe is live (use `checkout_started` as end-of-funnel meanwhile).
 
+### Design system / temas (claro + escuro)
+
+A UI é toda **token-driven** (Tailwind v4 `@theme` em `app/globals.css`): componentes consomem `var(--color-*)` — `bg`, `surface`, `surface-2`, `fg`, `muted`, `border`, `accent`, `accent-fg`, `accent-strong`. A **paleta é a da marca** (indigo `#4F46E5` + slate), igual ao email. Re-skinar = mudar os tokens, não os componentes.
+
+- **Claro = padrão.** Dark mode é por atributo **`[data-theme="dark"]` no `<html>`** (override dos tokens após o `@theme`; `@custom-variant dark` registra o variant). **NÃO** usa `prefers-color-scheme` como default (ficaria dark em OS dark, contra "claro por padrão").
+- **Toggle:** `app/_brand/theme-toggle.tsx` (client) grava `nf-theme` no localStorage + seta `data-theme`. Um **script anti-flash inline no `<head>`** (`layout.tsx`, `THEME_INIT`) aplica o tema antes do paint; `<html suppressHydrationWarning>` por causa disso. O script também honra **`?theme=dark`** (preview/QA por URL).
+- **Marca:** `app/_brand/logo.tsx` — `Logo` (ícone + wordmark) e `LogoIcon`. O ícone (N branco no quadrado indigo) é agnóstico ao tema; o wordmark usa `var(--color-fg)` e acompanha claro/escuro. Assets servidos de **`public/`**: `email-hero-{pt,en,es}.png` (screenshot do email real por idioma — a landing escolhe via `locale`, então a vitrine acompanha a troca de idioma) + `logo-icon.svg`. Os heroes são gerados com `npm run email -- <briefing> light <locale>` (CLI aceita locale) e fotografados; os briefings de exemplo ficam em `output/ads/` (gitignored).
+- **Cobertura verificada:** a **landing** (`app/page.tsx`) foi conferida visualmente em claro e escuro (é a página que o tráfego de anúncio vê). Páginas autenticadas (onboarding/settings) foram re-skinadas via tokens mas **só revisadas por código, não vistas em dark**. ⚠️ **Limitação conhecida:** badges semânticos (`bg-emerald-50`/`red-50`/`amber-50`/`sky-50`) seguem hardcoded — em dark aparecem como blocos pastel claros (legíveis, mas brilhantes); só a landing teve o box de erro feito theme-safe.
+
 ## Conventions
 
 - All user-facing copy, prompts, and log messages are **PT-BR**. The product voice ("amigo investido", dense self-contained summaries — not teasers) lives in `src/prompts/`.

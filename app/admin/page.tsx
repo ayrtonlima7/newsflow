@@ -53,7 +53,7 @@ export default async function AdminPage() {
           href="/api/admin/stats"
           target="_blank"
           rel="noopener"
-          className="self-start rounded-md border border-[var(--color-border)] bg-white px-3 py-1.5 text-xs hover:border-[var(--color-fg)]"
+          className="self-start rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-1.5 text-xs hover:border-[var(--color-fg)]"
         >
           Ver JSON cru ↗
         </Link>
@@ -110,7 +110,7 @@ function StatTile({
   return (
     <div
       className={cn(
-        'rounded-lg border bg-white p-5',
+        'rounded-lg border bg-[var(--color-surface)] p-5',
         accent === 'emerald' ? 'border-emerald-300' : 'border-[var(--color-border)]',
       )}
     >
@@ -134,7 +134,7 @@ function WindowCard({ title, data }: { title: string; data: WindowStats }) {
     : null;
 
   return (
-    <div className="flex flex-col gap-4 rounded-lg border border-[var(--color-border)] bg-white p-5">
+    <div className="flex flex-col gap-4 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-5">
       <div className="flex items-baseline justify-between">
         <h3 className="text-base font-medium">{title}</h3>
         <span className="text-xs text-[var(--color-muted)]">

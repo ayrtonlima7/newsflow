@@ -73,7 +73,7 @@ export function StepCard({ question, value, onChange, loading, dynamicChips }: P
           onChange={(e) => onChange(e.target.value)}
           placeholder={question.placeholder}
           rows={4}
-          className="w-full resize-none rounded-md border border-[var(--color-border)] bg-white px-4 py-3 text-base outline-none transition focus:border-[var(--color-fg)]"
+          className="w-full resize-none rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-3 text-base outline-none transition focus:border-[var(--color-fg)]"
         />
       )}
 
@@ -84,7 +84,7 @@ export function StepCard({ question, value, onChange, loading, dynamicChips }: P
           value={typeof value === 'string' ? value : ''}
           onChange={(e) => onChange(e.target.value)}
           placeholder={question.placeholder}
-          className="w-full rounded-md border border-[var(--color-border)] bg-white px-4 py-3 text-base outline-none transition focus:border-[var(--color-fg)]"
+          className="w-full rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-3 text-base outline-none transition focus:border-[var(--color-fg)]"
         />
       )}
 
@@ -107,7 +107,7 @@ export function StepCard({ question, value, onChange, loading, dynamicChips }: P
 
       {/* Caso 4: LOADING genérico (não inputFirst, mas dinâmico) */}
       {!question.multiline && !isSingleFreeText && !question.inputFirst && loading && (
-        <div className="rounded-md bg-white border border-[var(--color-border)] p-6 text-sm text-[var(--color-muted)]">
+        <div className="rounded-md bg-[var(--color-surface)] border border-[var(--color-border)] p-6 text-sm text-[var(--color-muted)]">
           {t('onb.genLoading')}
         </div>
       )}
@@ -129,7 +129,7 @@ export function StepCard({ question, value, onChange, loading, dynamicChips }: P
         <select
           value={typeof value === 'string' && HOURS.includes(value) ? value : ''}
           onChange={(e) => onChange(e.target.value)}
-          className="w-full rounded-md border border-[var(--color-border)] bg-white px-4 py-3 text-base outline-none transition focus:border-[var(--color-fg)]"
+          className="w-full rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-3 text-base outline-none transition focus:border-[var(--color-fg)]"
         >
           <option value="" disabled>
             {t('onb.otherHour')}
@@ -163,13 +163,13 @@ export function StepCard({ question, value, onChange, loading, dynamicChips }: P
               placeholder={
                 question.placeholder ?? (isMulti ? t('onb.addAnother') : t('onb.other'))
               }
-              className="flex-1 rounded-md border border-[var(--color-border)] bg-white px-4 py-2 text-sm outline-none transition focus:border-[var(--color-fg)]"
+              className="flex-1 rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-2 text-sm outline-none transition focus:border-[var(--color-fg)]"
             />
             <button
               type="button"
               onClick={addFreeText}
               disabled={!freeText.trim()}
-              className="rounded-md border border-[var(--color-border)] bg-white px-4 py-2 text-sm transition hover:border-[var(--color-fg)] disabled:opacity-50"
+              className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-2 text-sm transition hover:border-[var(--color-fg)] disabled:opacity-50"
             >
               {t('onb.add')}
             </button>
@@ -216,8 +216,8 @@ function ChipsFirstLayout({
             className={cn(
               'rounded-full border px-4 py-2 text-sm transition',
               isSelected
-                ? 'border-[var(--color-fg)] bg-[var(--color-fg)] text-white'
-                : 'border-[var(--color-border)] bg-white hover:border-[var(--color-fg)]',
+                ? 'border-[var(--color-accent)] bg-[var(--color-accent)] text-[var(--color-accent-fg)]'
+                : 'border-[var(--color-border)] bg-[var(--color-surface)] hover:border-[var(--color-fg)]',
             )}
           >
             {labelFor(chip)}
@@ -230,7 +230,7 @@ function ChipsFirstLayout({
         <button
           type="button"
           onClick={onClearSingle}
-          className="rounded-full border border-[var(--color-fg)] bg-[var(--color-fg)] text-white px-4 py-2 text-sm transition hover:opacity-90"
+          className="rounded-full border border-[var(--color-accent)] bg-[var(--color-accent)] text-[var(--color-accent-fg)] px-4 py-2 text-sm transition hover:opacity-90"
         >
           {labelFor(singleCustom)} ✕
         </button>
@@ -246,7 +246,7 @@ function ChipsFirstLayout({
               key={custom}
               type="button"
               onClick={() => toggleChip(custom)}
-              className="rounded-full border border-[var(--color-fg)] bg-[var(--color-fg)] text-white px-4 py-2 text-sm transition"
+              className="rounded-full border border-[var(--color-accent)] bg-[var(--color-accent)] text-[var(--color-accent-fg)] px-4 py-2 text-sm transition"
             >
               {custom} ✕
             </button>
@@ -303,13 +303,13 @@ function InputFirstLayout({
             }
           }}
           placeholder={question.placeholder ?? t('onb.typeEnter')}
-          className="flex-1 rounded-md border-2 border-[var(--color-border)] bg-white px-4 py-3 text-base outline-none transition focus:border-[var(--color-fg)]"
+          className="flex-1 rounded-md border-2 border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-3 text-base outline-none transition focus:border-[var(--color-fg)]"
         />
         <button
           type="button"
           onClick={addFreeText}
           disabled={!freeText.trim()}
-          className="rounded-md bg-[var(--color-fg)] px-4 py-3 text-sm font-medium text-white transition hover:opacity-90 disabled:opacity-50"
+          className="rounded-md bg-[var(--color-accent)] px-4 py-3 text-sm font-medium text-[var(--color-accent-fg)] transition hover:opacity-90 disabled:opacity-50"
         >
           {t('onb.add')}
         </button>
@@ -323,7 +323,7 @@ function InputFirstLayout({
               key={item}
               type="button"
               onClick={() => toggleChip(item)}
-              className="rounded-full border border-[var(--color-fg)] bg-[var(--color-fg)] px-3 py-1.5 text-sm text-white transition hover:opacity-90"
+              className="rounded-full border border-[var(--color-accent)] bg-[var(--color-accent)] px-3 py-1.5 text-sm text-[var(--color-accent-fg)] transition hover:opacity-90"
             >
               {item} ✕
             </button>
@@ -337,7 +337,7 @@ function InputFirstLayout({
           <button
             type="button"
             onClick={onClearSingle}
-            className="rounded-full border border-[var(--color-fg)] bg-[var(--color-fg)] px-3 py-1.5 text-sm text-white transition hover:opacity-90"
+            className="rounded-full border border-[var(--color-accent)] bg-[var(--color-accent)] px-3 py-1.5 text-sm text-[var(--color-accent-fg)] transition hover:opacity-90"
           >
             {singleVal} ✕
           </button>
@@ -356,7 +356,7 @@ function InputFirstLayout({
             {Array.from({ length: 6 }).map((_, i) => (
               <span
                 key={i}
-                className="h-7 w-24 animate-pulse rounded-full bg-stone-200"
+                className="h-7 w-24 animate-pulse rounded-full bg-[var(--color-border)]"
                 style={{ width: `${60 + ((i * 17) % 60)}px` }}
               />
             ))}
@@ -374,7 +374,7 @@ function InputFirstLayout({
                 key={chip}
                 type="button"
                 onClick={() => toggleChip(chip)}
-                className="rounded-full border border-[var(--color-border)] bg-white px-3 py-1.5 text-sm text-[var(--color-muted)] transition hover:border-[var(--color-fg)] hover:text-[var(--color-fg)]"
+                className="rounded-full border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-1.5 text-sm text-[var(--color-muted)] transition hover:border-[var(--color-fg)] hover:text-[var(--color-fg)]"
               >
                 + {chip}
               </button>

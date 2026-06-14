@@ -65,7 +65,7 @@ export function DeliveryEmailCard({ authEmail, deliveryEmail }: Props) {
   }
 
   return (
-    <div className="rounded-lg border border-[var(--color-border)] bg-white p-5">
+    <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-5">
       <p className="text-sm font-medium">{t('demail.title')}</p>
 
       {step === 'input' ? (
@@ -92,7 +92,7 @@ export function DeliveryEmailCard({ authEmail, deliveryEmail }: Props) {
               type="button"
               onClick={requestChange}
               disabled={pending || !dirty}
-              className="rounded-md bg-[var(--color-fg)] px-4 py-2 text-sm text-white transition hover:opacity-90 disabled:opacity-40"
+              className="rounded-md bg-[var(--color-accent)] px-4 py-2 text-sm text-[var(--color-accent-fg)] transition hover:opacity-90 disabled:opacity-40"
             >
               {pending ? t('demail.sending') : value.trim() ? t('demail.verify') : t('demail.save')}
             </button>
@@ -125,7 +125,7 @@ export function DeliveryEmailCard({ authEmail, deliveryEmail }: Props) {
               type="button"
               onClick={confirm}
               disabled={pending || code.length !== 6}
-              className="rounded-md bg-[var(--color-fg)] px-4 py-2 text-sm text-white transition hover:opacity-90 disabled:opacity-40"
+              className="rounded-md bg-[var(--color-accent)] px-4 py-2 text-sm text-[var(--color-accent-fg)] transition hover:opacity-90 disabled:opacity-40"
             >
               {pending ? t('demail.confirming') : t('demail.confirm')}
             </button>

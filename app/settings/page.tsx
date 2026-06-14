@@ -6,6 +6,7 @@ import { SettingsForm } from './settings-form';
 import { SampleCard } from './sample-card';
 import { SubscriptionCard } from './subscription-card';
 import { DeliveryEmailCard } from './delivery-email-card';
+import { ContactCard } from './contact-card';
 import { IdentifyUser } from '../_analytics/identify-user';
 import { canDeliver, type SubscriptionStatus } from '@/src/lib/subscription';
 import { getLocale } from '../_i18n/locale';
@@ -121,20 +122,8 @@ export default async function SettingsPage({
 
       <SettingsForm initial={initial} isActive={profile.is_active} />
 
-      {/* Ouvidoria — canal de contato direto (issue #33). A parte do email é o
-          contato no footer (#26); aqui é o equivalente dentro do app. */}
-      <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-5">
-        <p className="text-sm font-medium">{t('settings.contactTitle')}</p>
-        <p className="mt-1 text-xs text-[var(--color-muted)]">
-          {t('settings.contactBody')}{' '}
-          <a
-            href="mailto:news@trynewsflow.com"
-            className="font-medium text-[var(--color-accent)] hover:underline"
-          >
-            news@trynewsflow.com
-          </a>
-        </p>
-      </div>
+      {/* Ouvidoria — formulário de contato que envia via Resend (issue #33). */}
+      <ContactCard />
     </main>
   );
 }

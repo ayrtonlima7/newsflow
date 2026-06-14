@@ -395,3 +395,58 @@ export async function setActive(
   revalidatePath('/settings');
   return { ok: true };
 }
+
+export interface FeedbackResult {
+  ok: boolean;
+  error?: string;
+}
+
+/** Ouvidoria (issue #33): envia a mensagem do usuário pra equipe via Resend.
+ *  Email/nome vêm do login + perfil — não pedimos de novo. Reply-To = email do
+ *  usuário, pra respondermos direto. */
+export async function sendFeedback(message: string): Promise<FeedbackResult> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user?.email) return { ok: false, error: 'não autenticado' };
+
+  const msg = (message ?? '').trim();
+  if (msg.length < 2) return { ok: false, error: 'empty' };
+  if (msg.length > 2000) return { ok: false, error: 'mensagem muito longa (máx. 2000 caracteres)' };
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('nome')
+    .eq('user_id', user.id)
+    .maybeSingle();
+  const nome = profile?.nome?.trim() || '(sem nome)';
+
+  const resendKey = process.env.RESEND_API_KEY;
+  const from = process.env.RESEND_FROM;
+  if (!resendKey || !from) {
+    console.error('[sendFeedback] RESEND_API_KEY/RESEND_FROM ausente');
+    return { ok: false, error: 'envio indisponível no momento' };
+  }
+  // Destino = endereço do próprio sender (mandamos pra nós mesmos).
+  const to = from.match(/<([^>]+)>/)?.[1] ?? from;
+
+  try {
+    const resend = new Resend(resendKey);
+    const { error } = await resend.emails.send({
+      from,
+      to,
+      replyTo: user.email,
+      subject: `[Ouvidoria NewsFlow] ${nome}`,
+      text: `De: ${nome} <${user.email}>\nuser_id: ${user.id}\n\n${msg}`,
+    });
+    if (error) {
+      console.error('[sendFeedback] resend erro:', error);
+      return { ok: false, error: 'falha ao enviar' };
+    }
+    return { ok: true };
+  } catch (err) {
+    console.error('[sendFeedback] erro:', err);
+    return { ok: false, error: 'falha ao enviar' };
+  }
+}

@@ -8,6 +8,10 @@ const CHROME: Record<Locale, {
   helpful: string;
   yes: string;
   no: string;
+  footerShare: string;
+  footerPrefs: string;
+  footerPrefsLink: string;
+  footerContact: string;
   footer: string;
   titleFallback: string;
 }> = {
@@ -16,6 +20,10 @@ const CHROME: Record<Locale, {
     helpful: 'Isso foi útil?',
     yes: '👍 Sim',
     no: '👎 Não',
+    footerShare: 'Gostou? Compartilhe o NewsFlow com um amigo:',
+    footerPrefs: 'Quer ajustar temas ou frequência? Edite seu perfil nas',
+    footerPrefsLink: 'configurações',
+    footerContact: 'Críticas, sugestões ou problemas? Fale com a gente:',
     footer: 'Você recebe esses emails porque configurou seu perfil no NewsFlow.',
     titleFallback: 'Seu resumo',
   },
@@ -24,6 +32,10 @@ const CHROME: Record<Locale, {
     helpful: 'Was this helpful?',
     yes: '👍 Yes',
     no: '👎 No',
+    footerShare: 'Enjoying it? Share NewsFlow with a friend:',
+    footerPrefs: 'Want to adjust topics or frequency? Edit your profile in',
+    footerPrefsLink: 'settings',
+    footerContact: 'Feedback, suggestions or issues? Reach out:',
     footer: 'You receive these emails because you set up your profile on NewsFlow.',
     titleFallback: 'Your briefing',
   },
@@ -32,10 +44,20 @@ const CHROME: Record<Locale, {
     helpful: '¿Te resultó útil?',
     yes: '👍 Sí',
     no: '👎 No',
+    footerShare: '¿Te gusta? Comparte NewsFlow con un amigo:',
+    footerPrefs: '¿Quieres ajustar temas o frecuencia? Edita tu perfil en',
+    footerPrefsLink: 'configuración',
+    footerContact: '¿Críticas, sugerencias o problemas? Escríbenos:',
     footer: 'Recibes estos emails porque configuraste tu perfil en NewsFlow.',
     titleFallback: 'Tu resumen',
   },
 };
+
+/** Site + contato pro footer. App URL do env (fallback domínio de produção);
+ *  contato = endereço do sender no Resend (ver issue #26). */
+const SITE_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://trynewsflow.com';
+const SITE_HOST = SITE_URL.replace(/^https?:\/\//, '').replace(/\/$/, '');
+const SUPPORT_EMAIL = 'news@trynewsflow.com';
 
 /** Escapa texto pra HTML (previne quebra de layout e injeção). */
 function esc(s: string): string {
@@ -185,9 +207,25 @@ export function renderEmailHtml(
         </div>
       </div>
     </div>
-    <p style="margin:20px 0 0 0;text-align:center;font-size:12px;color:${c.footer};">
-      ${t.footer}
-    </p>
+    <!-- Footer padrão: marca, convite a compartilhar, ajuste de preferências e contato (issue #26) -->
+    <div style="margin:22px 4px 0 4px;text-align:center;font-size:12px;line-height:1.7;color:${c.footer};">
+      <p style="margin:0 0 12px 0;">
+        <a href="${SITE_URL}" style="color:${c.link};text-decoration:none;font-weight:700;font-size:14px;letter-spacing:-0.01em;" target="_blank" rel="noopener">NewsFlow</a>
+      </p>
+      <p style="margin:0 0 6px 0;">
+        ${t.footerShare}
+        <a href="${SITE_URL}" style="color:${c.link};text-decoration:none;" target="_blank" rel="noopener">${esc(SITE_HOST)}</a>
+      </p>
+      <p style="margin:0 0 6px 0;">
+        ${t.footerPrefs}
+        <a href="${SITE_URL}/settings" style="color:${c.link};text-decoration:none;" target="_blank" rel="noopener">${t.footerPrefsLink}</a>.
+      </p>
+      <p style="margin:0 0 14px 0;">
+        ${t.footerContact}
+        <a href="mailto:${SUPPORT_EMAIL}" style="color:${c.link};text-decoration:none;">${SUPPORT_EMAIL}</a>
+      </p>
+      <p style="margin:0;opacity:0.75;">${t.footer}</p>
+    </div>
   </div>
 </body>
 </html>`;

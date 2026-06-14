@@ -41,7 +41,7 @@ export function LoginForm({ next }: { next?: string }) {
   // Em dev: nunca chega aqui (redirect direto pro next)
   if (state.status === 'sent') {
     return (
-      <div className="rounded-lg border border-[var(--color-border)] bg-white p-6 space-y-3">
+      <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-6 space-y-3">
         <p className="text-2xl">📬</p>
         <h2 className="text-lg font-medium">{t('login.sentTitle')}</h2>
         <p className="text-sm text-[var(--color-muted)]">
@@ -60,7 +60,7 @@ export function LoginForm({ next }: { next?: string }) {
         <button
           type="submit"
           onClick={() => track(ANALYTICS_EVENTS.SIGNUP_STARTED, { method: 'google' })}
-          className="flex w-full items-center justify-center gap-3 rounded-md border border-[var(--color-border)] bg-white px-6 py-3 text-sm font-medium text-[var(--color-fg)] transition hover:bg-stone-50"
+          className="flex w-full items-center justify-center gap-3 rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-6 py-3 text-sm font-medium text-[var(--color-fg)] transition hover:bg-[var(--color-surface-2)]"
         >
           <GoogleIcon />
           {t('login.google')}
@@ -107,7 +107,7 @@ export function LoginForm({ next }: { next?: string }) {
                 type="email"
                 required
                 placeholder={t('login.emailPlaceholder')}
-                className="w-full rounded-md border border-[var(--color-border)] bg-white px-4 py-3 text-base outline-none transition focus:border-[var(--color-fg)]"
+                className="w-full rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-3 text-base outline-none transition focus:border-[var(--color-fg)]"
               />
             </div>
             <button

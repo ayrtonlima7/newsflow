@@ -18,6 +18,8 @@ const pt: Dictionary = {
   'nav.signIn': 'Entrar',
   'nav.settings': 'Configurações',
   'lang.label': 'Idioma',
+  'theme.toDark': 'Modo escuro',
+  'theme.toLight': 'Modo claro',
 
   // landing
   'landing.eyebrow': 'NewsFlow AI',
@@ -161,6 +163,8 @@ const en: Dictionary = {
   'nav.signIn': 'Sign in',
   'nav.settings': 'Settings',
   'lang.label': 'Language',
+  'theme.toDark': 'Dark mode',
+  'theme.toLight': 'Light mode',
 
   'landing.eyebrow': 'NewsFlow AI',
   'landing.title': 'Your custom briefing, written like a friend would tell you.',
@@ -296,6 +300,8 @@ const es: Dictionary = {
   'nav.signIn': 'Entrar',
   'nav.settings': 'Configuración',
   'lang.label': 'Idioma',
+  'theme.toDark': 'Modo oscuro',
+  'theme.toLight': 'Modo claro',
 
   'landing.eyebrow': 'NewsFlow AI',
   'landing.title': 'Tu resumen a medida, escrito como te lo contaría un amigo.',

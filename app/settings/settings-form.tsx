@@ -72,7 +72,7 @@ export function SettingsForm({ initial, isActive: initialActive }: Props) {
 
   return (
     <div className="space-y-8">
-      <div className="flex items-center justify-between gap-4 rounded-lg border border-[var(--color-border)] bg-white p-5">
+      <div className="flex items-center justify-between gap-4 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-5">
         <div>
           <p className="text-sm font-medium">
             {active ? t('settings.statusOn') : t('settings.statusOff')}
@@ -88,7 +88,7 @@ export function SettingsForm({ initial, isActive: initialActive }: Props) {
           className={cn(
             'shrink-0 rounded-md px-4 py-2 text-sm transition disabled:opacity-50',
             active
-              ? 'border border-[var(--color-border)] bg-white hover:border-[var(--color-fg)]'
+              ? 'border border-[var(--color-border)] bg-[var(--color-surface)] hover:border-[var(--color-fg)]'
               : 'bg-[var(--color-accent)] text-[var(--color-accent-fg)] hover:opacity-90',
           )}
         >
@@ -101,7 +101,7 @@ export function SettingsForm({ initial, isActive: initialActive }: Props) {
         return (
           <div
             key={id}
-            className="rounded-lg border border-[var(--color-border)] bg-white p-6"
+            className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-6"
           >
             <StepCard
               question={q}
@@ -112,7 +112,7 @@ export function SettingsForm({ initial, isActive: initialActive }: Props) {
         );
       })}
 
-      <div className="sticky bottom-4 z-10 flex flex-col gap-3 rounded-lg border border-[var(--color-border)] bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+      <div className="sticky bottom-4 z-10 flex flex-col gap-3 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
         <div className="text-sm">
           {feedback?.kind === 'saved' && (
             <span className="text-emerald-700">{t('settings.saved')}</span>
@@ -132,7 +132,7 @@ export function SettingsForm({ initial, isActive: initialActive }: Props) {
             type="button"
             onClick={handleReset}
             disabled={!isDirty || pending}
-            className="rounded-md border border-[var(--color-border)] bg-white px-4 py-2 text-sm transition hover:border-[var(--color-fg)] disabled:opacity-40"
+            className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-2 text-sm transition hover:border-[var(--color-fg)] disabled:opacity-40"
           >
             {t('settings.discard')}
           </button>

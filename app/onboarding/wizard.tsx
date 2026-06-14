@@ -206,9 +206,9 @@ export function OnboardingWizard({ userEmail }: { userEmail: string }) {
         <span>{userEmail}</span>
       </div>
 
-      <div className="h-1 w-full overflow-hidden rounded-full bg-stone-200">
+      <div className="h-1 w-full overflow-hidden rounded-full bg-[var(--color-border)]">
         <div
-          className="h-full bg-[var(--color-fg)] transition-all"
+          className="h-full bg-[var(--color-accent)] transition-all"
           style={{ width: `${((visibleIndex + 1) / visibleTotal) * 100}%` }}
         />
       </div>
@@ -232,7 +232,7 @@ export function OnboardingWizard({ userEmail }: { userEmail: string }) {
           type="button"
           onClick={prev}
           disabled={step === 0 || loadingTopics}
-          className="rounded-md border border-[var(--color-border)] bg-white px-4 py-2 text-sm transition hover:border-[var(--color-fg)] disabled:opacity-40"
+          className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-2 text-sm transition hover:border-[var(--color-fg)] disabled:opacity-40"
         >
           {t('onb.back')}
         </button>

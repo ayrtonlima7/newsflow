@@ -115,7 +115,7 @@ export default async function SettingsPage({
       {gate.allowed && (
         <SampleCard
           userEmail={profile.delivery_email || user.email || ''}
-          lastDeliveredAt={profile.last_delivered_at}
+          sampleCooldownUntil={profile.sample_cooldown_until ?? null}
         />
       )}
 

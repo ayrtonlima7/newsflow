@@ -89,6 +89,9 @@ export interface EmailOutput {
 }
 
 export interface JanelaFrescor {
+  /** Cadência-base em dias (diária=1, a cada 3 dias=3, semanal=7), SEM a folga.
+   *  Usada pro cooldown do "Gerar agora" (= período entre curadorias). */
+  baseDias: number;
   /** Janela efetiva em dias (cadência-base + folga de frescor). Alimenta tanto
    *  a busca (Tavily.days) quanto o corte de frescor. Cadência-base diária → 3,
    *  3-day → 6, semanal → 10 (base 1/3/7 + GRACE_DIAS). */
@@ -144,6 +147,7 @@ export function frequenciaParaJanela(frequencia: string): JanelaFrescor {
   else rotulo = `últimos ${janelaDias} dias`;
 
   return {
+    baseDias,
     janelaDias,
     rotulo,
     todayISO,

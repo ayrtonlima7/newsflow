@@ -9,7 +9,7 @@ import { normalizeTopics } from '@/src/lib/topic-normalization';
 import { deriveDomains } from '@/src/lib/domain-derivation';
 import { runDeliveryPipeline } from '@/src/lib/delivery';
 import type { Profile } from '@/src/lib/types';
-import { SAMPLE_COOLDOWN_MS } from './constants';
+import { formatCooldown } from './constants';
 
 const DELIVERY_CODE_TTL_MIN = 15;
 const DELIVERY_CODE_MAX_ATTEMPTS = 5;
@@ -139,15 +139,15 @@ export async function sendSampleNow(): Promise<SampleResult> {
   if (error) return { ok: false, error: error.message };
   if (!profileRow) return { ok: false, error: 'perfil não encontrado' };
 
-  if (profileRow.last_delivered_at) {
-    const last = new Date(profileRow.last_delivered_at).getTime();
-    const elapsed = Date.now() - last;
-    if (elapsed < SAMPLE_COOLDOWN_MS) {
-      const remainingMs = SAMPLE_COOLDOWN_MS - elapsed;
-      const remainingMin = Math.ceil(remainingMs / 60_000);
+  // Cooldown segue a frequência do perfil (gravado em sample_cooldown_until na
+  // última geração — travado naquele momento, mudar a frequência depois não
+  // encurta). Coluna ausente (migration não aplicada) → undefined → sem cooldown.
+  if (profileRow.sample_cooldown_until) {
+    const remainingMs = new Date(profileRow.sample_cooldown_until).getTime() - Date.now();
+    if (remainingMs > 0) {
       return {
         ok: false,
-        error: `Aguarde ${remainingMin} minuto${remainingMin > 1 ? 's' : ''} antes de gerar outro email`,
+        error: `Você já gerou um email recentemente. O próximo poderá ser gerado em ${formatCooldown(remainingMs)} — o intervalo segue a frequência do seu perfil.`,
         cooldownRemainingMs: remainingMs,
       };
     }

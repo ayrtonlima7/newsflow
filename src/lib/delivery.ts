@@ -216,10 +216,27 @@ export async function runDeliveryPipeline(
       })
       .eq('id', deliveryId);
 
+    // last_delivered_at é load-bearing (idempotência do cron) — atualiza sempre,
+    // isolado de qualquer coluna nova.
     await supabase
       .from('profiles')
       .update({ last_delivered_at: new Date().toISOString() })
       .eq('user_id', input.userId);
+
+    // Cooldown do "Gerar agora": travado AGORA com a cadência-base da frequência
+    // ATUAL (diária=1d, 3 dias=3d, semanal=7d). Mudar a frequência depois NÃO
+    // encurta (o valor já ficou gravado). Best-effort e SEPARADO: se a migration
+    // 0014 ainda não foi aplicada, este update falha em silêncio sem derrubar a
+    // entrega nem o update acima.
+    const baseDias = frequenciaParaJanela(input.profile.frequencia).baseDias;
+    const cooldownUntilISO = new Date(Date.now() + baseDias * 24 * 60 * 60 * 1000).toISOString();
+    const { error: cooldownErr } = await supabase
+      .from('profiles')
+      .update({ sample_cooldown_until: cooldownUntilISO })
+      .eq('user_id', input.userId);
+    if (cooldownErr) {
+      console.warn(`[delivery] sample_cooldown_until não gravado (migration 0014 aplicada?): ${cooldownErr.message}`);
+    }
 
     return {
       deliveryId,

@@ -3,33 +3,27 @@
 import { useEffect, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { sendSampleNow, type SampleResult } from './actions';
-import { SAMPLE_COOLDOWN_MS } from './constants';
+import { formatCooldown } from './constants';
 import { useT } from '../_i18n/provider';
 
 interface Props {
   userEmail: string;
-  lastDeliveredAt: string | null;
+  /** Quando o próximo "Gerar agora" fica disponível (ISO). Segue a frequência
+   *  do perfil; null = sem cooldown. */
+  sampleCooldownUntil: string | null;
 }
 
 const IS_DEV = process.env.NODE_ENV === 'development';
 
-function formatRemaining(ms: number): string {
-  const totalSeconds = Math.ceil(ms / 1000);
-  const min = Math.floor(totalSeconds / 60);
-  const sec = totalSeconds % 60;
-  if (min === 0) return `${sec}s`;
-  return `${min}m ${sec.toString().padStart(2, '0')}s`;
-}
-
-export function SampleCard({ userEmail, lastDeliveredAt }: Props) {
+export function SampleCard({ userEmail, sampleCooldownUntil }: Props) {
   const router = useRouter();
   const t = useT();
   const [pending, startTransition] = useTransition();
   const [result, setResult] = useState<SampleResult | null>(null);
   const [now, setNow] = useState<number>(() => Date.now());
 
-  const lastMs = lastDeliveredAt ? new Date(lastDeliveredAt).getTime() : 0;
-  const cooldownRemaining = lastMs ? Math.max(0, lastMs + SAMPLE_COOLDOWN_MS - now) : 0;
+  const untilMs = sampleCooldownUntil ? new Date(sampleCooldownUntil).getTime() : 0;
+  const cooldownRemaining = untilMs ? Math.max(0, untilMs - now) : 0;
   const onCooldown = cooldownRemaining > 0;
 
   useEffect(() => {
@@ -52,7 +46,7 @@ export function SampleCard({ userEmail, lastDeliveredAt }: Props) {
   const buttonLabel = pending
     ? t('sample.generating')
     : onCooldown
-      ? t('sample.wait', { time: formatRemaining(cooldownRemaining) })
+      ? t('sample.wait', { time: formatCooldown(cooldownRemaining) })
       : t('sample.send');
 
   return (

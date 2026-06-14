@@ -20,7 +20,8 @@ export default async function HomePage({
   } = await supabase.auth.getUser();
   if (user) redirect('/settings');
 
-  const dict = getDictionary(await getLocale());
+  const locale = await getLocale();
+  const dict = getDictionary(locale);
   const t = (k: string) => translate(dict, k);
 
   return (
@@ -65,7 +66,7 @@ export default async function HomePage({
           <div className="relative mx-auto max-w-md overflow-hidden rounded-2xl border border-[var(--color-border)] shadow-2xl">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src="/email-hero.png"
+              src={`/email-hero-${locale}.png`}
               alt="NewsFlow"
               className="block max-h-[360px] w-full object-cover object-top lg:max-h-[560px]"
             />

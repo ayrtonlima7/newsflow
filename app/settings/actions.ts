@@ -428,8 +428,11 @@ export async function sendFeedback(message: string): Promise<FeedbackResult> {
     console.error('[sendFeedback] RESEND_API_KEY/RESEND_FROM ausente');
     return { ok: false, error: 'envio indisponível no momento' };
   }
-  // Destino = endereço do próprio sender (mandamos pra nós mesmos).
-  const to = from.match(/<([^>]+)>/)?.[1] ?? from;
+  // Destino do feedback: FEEDBACK_TO (inbox dedicado, ex: gmail do NewsFlow) →
+  // ADMIN_EMAIL → o próprio sender (fallback). Reply-To é sempre o email do
+  // usuário, então você responde direto pra ele.
+  const fromEmail = from.match(/<([^>]+)>/)?.[1] ?? from;
+  const to = process.env.FEEDBACK_TO ?? process.env.ADMIN_EMAIL ?? fromEmail;
 
   try {
     const resend = new Resend(resendKey);

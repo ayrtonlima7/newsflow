@@ -85,6 +85,37 @@ function resolveDomains(profile: Profile, locale: Locale): string[] | undefined 
   return DOMAINS_BY_LOCALE[locale];
 }
 
+/** Normaliza título pra detecção de duplicata (minúsculo, sem acento/pontuação). */
+function normalizeTitleForDedup(s: string): string {
+  return s
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+}
+
+/**
+ * Remove itens duplicados DENTRO do mesmo briefing. O LLM às vezes seleciona a
+ * mesma matéria 2× (URL idêntica) ou a mesma notícia por fontes diferentes
+ * (título quase idêntico). Mantém a 1ª ocorrência. (Dedup entre EDIÇÕES é outro
+ * mecanismo, via `excludeUrls`.)
+ */
+export function dedupeItems<T extends { url: string; titulo: string }>(itens: T[]): T[] {
+  const seenUrl = new Set<string>();
+  const seenTitle = new Set<string>();
+  const out: T[] = [];
+  for (const it of itens) {
+    const url = (it.url ?? '').replace(/\/+$/, '').toLowerCase();
+    const title = normalizeTitleForDedup(it.titulo ?? '');
+    if (seenUrl.has(url) || (title.length > 0 && seenTitle.has(title))) continue;
+    seenUrl.add(url);
+    if (title) seenTitle.add(title);
+    out.push(it);
+  }
+  return out;
+}
+
 /**
  * Gera o briefing em 2 passos:
  *   1. Tavily busca conteúdo REAL e fresco (URLs verdadeiras + datas).
@@ -106,12 +137,31 @@ export async function generateBriefing(
     throw new Error('curate: nenhuma query de busca derivada do perfil');
   }
   const tTavily = Date.now();
+  const restrictedDomains = resolveDomains(profile, locale);
   let rawResults = await tavilySearchMany(queries, {
     days: janela.janelaDias,
     maxResults: 8,
     topic: 'news',
-    includeDomains: resolveDomains(profile, locale),
+    includeDomains: restrictedDomains,
   });
+  // Fallback: se a busca foi restrita a domínios (perfis pt) e veio MUITO pouco,
+  // refaz SEM restrição (global) e mescla — tópicos internacionais/de nicho (ex:
+  // ferramentas de produção musical, libs estrangeiras) não têm cobertura nos
+  // sites de notícia BR, e a restrição sozinha devolvia briefing VAZIO. Mantém a
+  // preferência BR (resultados restritos vêm primeiro) e só dispara quando faltou
+  // conteúdo de verdade (< itemsMin) — não penaliza o usuário BR comum.
+  if (restrictedDomains && rawResults.length < janela.itemsMin) {
+    console.warn(
+      `[curate] busca restrita a domínios devolveu ${rawResults.length} (< itemsMin ${janela.itemsMin}) — refazendo SEM restrição de domínio (fallback global)`,
+    );
+    const globalResults = await tavilySearchMany(queries, {
+      days: janela.janelaDias,
+      maxResults: 8,
+      topic: 'news',
+    });
+    const seenUrls = new Set(rawResults.map((r) => r.url));
+    rawResults = [...rawResults, ...globalResults.filter((r) => !seenUrls.has(r.url))];
+  }
   console.log(
     `[timing] Tavily (${queries.length} queries): ${((Date.now() - tTavily) / 1000).toFixed(1)}s → ${rawResults.length} resultados | total ${since()}`,
   );
@@ -178,6 +228,16 @@ export async function generateBriefing(
   });
   const hallucinatedUrlsDropped = beforeCount - briefing.itens.length;
 
+  // --- Dedup DENTRO do briefing: o LLM às vezes repete a mesma matéria (URL
+  //     idêntica) ou a mesma notícia por fontes diferentes (título quase igual).
+  //     Remove duplicatas mantendo a 1ª. (Era o bug do "artigo repetido".) ---
+  const beforeDedup = briefing.itens.length;
+  briefing.itens = dedupeItems(briefing.itens);
+  const dupDropped = beforeDedup - briefing.itens.length;
+  if (dupDropped > 0) {
+    console.warn(`[curate] ${dupDropped} item(s) duplicado(s) removido(s) (mesma URL/título no mesmo briefing)`);
+  }
+
   // --- Cross-validação de datas contra os resultados Tavily (ground truth) ---
   // Quando o Tavily tem published_date, ELA é a verdade — sobrescreve a data que
   // o LLM extraiu (que pode estar errada). Quando o Tavily NÃO tem data, deixamos
@@ -241,7 +301,7 @@ export async function generateBriefing(
 
   const cost = calculateCost(provider.model, result.usage);
   console.log(
-    `[curate] final: ${briefing.itens.length} item(s) | search→${rawResults.length}, IA selecionou→${beforeCount}, alucinadas→${hallucinatedUrlsDropped}, stale→${staleDropped.length}, sem-data-dropados→${undatedDropped}, link-morto→${deadDropped.length}`,
+    `[curate] final: ${briefing.itens.length} item(s) | search→${rawResults.length}, IA selecionou→${beforeCount}, alucinadas→${hallucinatedUrlsDropped}, dup→${dupDropped}, stale→${staleDropped.length}, sem-data-dropados→${undatedDropped}, link-morto→${deadDropped.length}`,
   );
 
   return {

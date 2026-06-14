@@ -373,9 +373,10 @@ export function filterByFreshness(
 export async function generateEmail(
   profile: Profile,
   briefing: Briefing,
+  briefingId?: string | null,
 ): Promise<{ email: EmailOutput; meta: PipelineMeta }> {
   const locale = normalizeLocale(profile.idioma);
-  const html = renderEmailHtml(briefing, locale);
+  const html = renderEmailHtml(briefing, locale, { briefingId });
   const assuntoFallback = { pt: 'Seu resumo de hoje', en: 'Your briefing today', es: 'Tu resumen de hoy' }[locale];
   const assunto = briefing.assunto?.trim() || assuntoFallback;
   return {

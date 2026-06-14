@@ -29,6 +29,7 @@ export const ANALYTICS_EVENTS = {
   PAYWALL_VIEW: 'paywall_view',
   CHECKOUT_STARTED: 'checkout_started',
   SUBSCRIBED: 'subscribed',
+  SHARED_ITEM_VIEWED: 'shared_item_viewed',
 } as const;
 
 export type AnalyticsEventName =
@@ -53,6 +54,9 @@ export interface EventPayloads {
   paywall_view: { gate_state: string };
   checkout_started: { plan: 'mensal' | 'anual' };
   subscribed: { plan: 'mensal' | 'anual' | null };
+  /** Página pública de uma notícia compartilhada (topo do funil de aquisição
+   *  orgânica via share). */
+  shared_item_viewed: Record<string, never>;
 }
 
 /** Properties de pessoa (setadas no identify) — úteis pra cruzar com o Supabase. */

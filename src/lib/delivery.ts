@@ -142,7 +142,7 @@ export async function runDeliveryPipeline(
       };
     }
 
-    const { email, meta: emailMeta } = await generateEmail(input.profile, briefing);
+    const { email, meta: emailMeta } = await generateEmail(input.profile, briefing, briefingId);
     costBrl += emailMeta.cost.totalBRL;
 
     const { data: deliveryRow, error: dErr } = await supabase

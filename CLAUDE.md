@@ -42,7 +42,7 @@ Next.js 15 App Router + React 19 + Tailwind 4 + Supabase + Resend. **Search via 
 
 ### Directory split
 
-- `app/` — Next routes, server actions, pages (`/login`, `/onboarding`, `/settings`, `/admin`, plus `app/api/*` and `app/auth/confirm`). `app/api/dev/preview/[id]` serves delivery HTML in dev only. `app/_analytics/` holds the client analytics provider + identify component (see Analytics).
+- `app/` — Next routes, server actions, pages (`/login`, `/onboarding`, `/settings`, `/admin`, plus `app/api/*` and `app/auth/confirm`). `app/api/dev/preview/[id]` serves delivery HTML in dev only. **`app/n/[briefingId]/[index]`** is the **public** share page for an individual curated item (issue #6) — no auth (not in the middleware `PROTECTED_PREFIXES`); reads the item from `briefings` via the admin client, shows the voiced summary + original link + a signup CTA + OG tags (`public/og-default.png`); the email links to it per item (`renderEmailHtml`'s `opts.briefingId` → `…/n/<id>/<index>?utm_source=email&utm_medium=share`). `app/_analytics/` holds the client analytics provider + identify component (see Analytics).
 - `src/` — non-Next code: `cli/` scripts, `prompts/` (just `curate.ts`), `lib/` (pipeline, delivery, providers, **search**, **email-template**, types, pricing, url-validation, topic-normalization, domain-derivation, admin-stats, **analytics/**).
 - `lib/supabase/` — three Supabase clients (browser, server-RSC, admin/service-role). Path is `@/lib/supabase/...`.
 - `supabase/migrations/` — SQL migrations applied manually via Supabase SQL editor. `supabase/scripts/` — one-off SQL (e.g. reset).

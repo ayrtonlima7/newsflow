@@ -5,6 +5,7 @@ import { HTML_LANG, INTL_LOCALE, type Locale } from './i18n';
  *  já vem traduzido do briefing; aqui é só a moldura. */
 const CHROME: Record<Locale, {
   readSource: string;
+  shareItem: string;
   helpful: string;
   yes: string;
   no: string;
@@ -17,6 +18,7 @@ const CHROME: Record<Locale, {
 }> = {
   pt: {
     readSource: 'Ler na fonte →',
+    shareItem: 'Compartilhar →',
     helpful: 'Isso foi útil?',
     yes: '👍 Sim',
     no: '👎 Não',
@@ -29,6 +31,7 @@ const CHROME: Record<Locale, {
   },
   en: {
     readSource: 'Read at source →',
+    shareItem: 'Share →',
     helpful: 'Was this helpful?',
     yes: '👍 Yes',
     no: '👎 No',
@@ -41,6 +44,7 @@ const CHROME: Record<Locale, {
   },
   es: {
     readSource: 'Leer en la fuente →',
+    shareItem: 'Compartir →',
     helpful: '¿Te resultó útil?',
     yes: '👍 Sí',
     no: '👎 No',
@@ -143,20 +147,25 @@ function resolveTheme(explicit?: EmailTheme): EmailTheme {
 export function renderEmailHtml(
   briefing: Briefing,
   locale: Locale = 'pt',
-  opts: { theme?: EmailTheme } = {},
+  opts: { theme?: EmailTheme; briefingId?: string | null } = {},
 ): string {
   const t = CHROME[locale];
   const c = THEMES[resolveTheme(opts.theme)];
   const intro = briefing.intro?.trim() ?? '';
 
   const itemsHtml = briefing.itens
-    .map((item) => {
+    .map((item, idx) => {
       const titulo = esc(item.titulo);
       const fonte = esc(item.fonte);
       const data = formatItemDate(item.data_publicacao, locale);
       // fonte · data (a data só aparece quando válida)
       const meta = data ? `${fonte} &middot; ${esc(data)}` : fonte;
       const url = item.url; // já validada
+      // Link de compartilhamento → página pública /n/[briefingId]/[idx] (issue #6).
+      // Só quando há briefingId (entrega real); no preview do CLI fica sem.
+      const shareLink = opts.briefingId
+        ? `<span style="margin:0 10px;color:${c.meta};">·</span><a href="${SITE_URL}/n/${opts.briefingId}/${idx}?utm_source=email&amp;utm_medium=share" style="font-size:14px;font-weight:600;color:${c.link};text-decoration:none;" target="_blank" rel="noopener">${t.shareItem}</a>`
+        : '';
       return `
       <div style="margin:0 0 28px 0;padding:0 0 28px 0;border-bottom:1px solid ${c.divider};">
         <h2 style="margin:0 0 8px 0;font-size:18px;line-height:1.35;font-weight:600;">
@@ -164,7 +173,7 @@ export function renderEmailHtml(
         </h2>
         <p style="margin:0 0 10px 0;font-size:12px;color:${c.meta};text-transform:uppercase;letter-spacing:0.04em;">${meta}</p>
         <p style="margin:0 0 14px 0;font-size:15px;line-height:1.65;color:${c.body};">${corpoToHtml(item.corpo)}</p>
-        <a href="${url}" style="font-size:14px;font-weight:600;color:${c.link};text-decoration:none;" target="_blank" rel="noopener">${t.readSource}</a>
+        <a href="${url}" style="font-size:14px;font-weight:600;color:${c.link};text-decoration:none;" target="_blank" rel="noopener">${t.readSource}</a>${shareLink}
       </div>`;
     })
     .join('\n');

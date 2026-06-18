@@ -2,7 +2,8 @@ import { getProvider, extractJson } from './providers';
 import { buildCurateFromResultsPrompt, buildSearchQueries } from '../prompts/curate';
 import { calculateCost } from './pricing';
 import { validateSelectedLeniently, type DroppedItem } from './url-validation';
-import { tavilySearchMany, tavilyExtract } from './search';
+import { tavilySearchMany, tavilyExtract, type SearchResult } from './search';
+import { googleNewsSearchMany } from './search-rss';
 import { renderEmailHtml } from './email-template';
 import type { Profile, Briefing, BriefingItem, EmailOutput } from './types';
 import { frequenciaParaJanela } from './types';
@@ -131,40 +132,51 @@ export async function generateBriefing(
   const t0 = Date.now();
   const since = () => `${((Date.now() - t0) / 1000).toFixed(1)}s`;
 
-  // --- Passo 1: busca real via Tavily ---
+  // --- Passo 1: busca real. Fonte selecionável por env SEARCH_PROVIDER:
+  //     'rss' = Google News RSS (datado, cobre nicho/local que o Tavily não pega);
+  //     qualquer outro / ausente = Tavily (default). ---
+  const searchProvider = process.env.SEARCH_PROVIDER === 'rss' ? 'rss' : 'tavily';
   const queries = buildSearchQueries(profile, locale);
   if (queries.length === 0) {
     throw new Error('curate: nenhuma query de busca derivada do perfil');
   }
-  const tTavily = Date.now();
-  const restrictedDomains = resolveDomains(profile, locale);
-  let rawResults = await tavilySearchMany(queries, {
-    days: janela.janelaDias,
-    maxResults: 8,
-    topic: 'news',
-    includeDomains: restrictedDomains,
-  });
-  // Fallback: se a busca foi restrita a domínios (perfis pt) e veio MUITO pouco,
-  // refaz SEM restrição (global) e mescla — tópicos internacionais/de nicho (ex:
-  // ferramentas de produção musical, libs estrangeiras) não têm cobertura nos
-  // sites de notícia BR, e a restrição sozinha devolvia briefing VAZIO. Mantém a
-  // preferência BR (resultados restritos vêm primeiro) e só dispara quando faltou
-  // conteúdo de verdade (< itemsMin) — não penaliza o usuário BR comum.
-  if (restrictedDomains && rawResults.length < janela.itemsMin) {
-    console.warn(
-      `[curate] busca restrita a domínios devolveu ${rawResults.length} (< itemsMin ${janela.itemsMin}) — refazendo SEM restrição de domínio (fallback global)`,
+  const tSearch = Date.now();
+  let rawResults: SearchResult[];
+  if (searchProvider === 'rss') {
+    rawResults = await googleNewsSearchMany(queries, { days: janela.janelaDias, maxResults: 12 }, locale);
+    console.log(
+      `[timing] Google News RSS (${queries.length} queries): ${((Date.now() - tSearch) / 1000).toFixed(1)}s → ${rawResults.length} resultados | total ${since()}`,
     );
-    const globalResults = await tavilySearchMany(queries, {
+  } else {
+    const restrictedDomains = resolveDomains(profile, locale);
+    rawResults = await tavilySearchMany(queries, {
       days: janela.janelaDias,
       maxResults: 8,
       topic: 'news',
+      includeDomains: restrictedDomains,
     });
-    const seenUrls = new Set(rawResults.map((r) => r.url));
-    rawResults = [...rawResults, ...globalResults.filter((r) => !seenUrls.has(r.url))];
+    // Fallback: se a busca foi restrita a domínios (perfis pt) e veio MUITO pouco,
+    // refaz SEM restrição (global) e mescla — tópicos internacionais/de nicho (ex:
+    // ferramentas de produção musical, libs estrangeiras) não têm cobertura nos
+    // sites de notícia BR, e a restrição sozinha devolvia briefing VAZIO. Mantém a
+    // preferência BR (resultados restritos vêm primeiro) e só dispara quando faltou
+    // conteúdo de verdade (< itemsMin) — não penaliza o usuário BR comum.
+    if (restrictedDomains && rawResults.length < janela.itemsMin) {
+      console.warn(
+        `[curate] busca restrita a domínios devolveu ${rawResults.length} (< itemsMin ${janela.itemsMin}) — refazendo SEM restrição de domínio (fallback global)`,
+      );
+      const globalResults = await tavilySearchMany(queries, {
+        days: janela.janelaDias,
+        maxResults: 8,
+        topic: 'news',
+      });
+      const seenUrls = new Set(rawResults.map((r) => r.url));
+      rawResults = [...rawResults, ...globalResults.filter((r) => !seenUrls.has(r.url))];
+    }
+    console.log(
+      `[timing] Tavily (${queries.length} queries): ${((Date.now() - tSearch) / 1000).toFixed(1)}s → ${rawResults.length} resultados | total ${since()}`,
+    );
   }
-  console.log(
-    `[timing] Tavily (${queries.length} queries): ${((Date.now() - tTavily) / 1000).toFixed(1)}s → ${rawResults.length} resultados | total ${since()}`,
-  );
 
   // --- Dedup entre entregas: remove URLs que o usuário já recebeu nas edições
   //     recentes ANTES do LLM ver (assim ele escolhe alternativas frescas em vez
@@ -203,8 +215,10 @@ export async function generateBriefing(
   //     não pagamos /extract por eles. Limita a itemsMax+5 pra bound de custo
   //     (~0,2 crédito/URL): o LLM seleciona dos mais bem ranqueados de qualquer
   //     forma. Fail-soft: sem texto, o corpo cai pro snippet. ---
+  // RSS (Google News) devolve links-redirect que o /extract do Tavily não
+  // resolve — pular extração nesse modo (corpo fica no snippet; Tier 1.5 resolve).
   const extractCandidates =
-    process.env.SKIP_EXTRACT === '1'
+    process.env.SKIP_EXTRACT === '1' || searchProvider === 'rss'
       ? []
       : rawResults
           .filter((r) => !r.rawContent)

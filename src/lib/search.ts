@@ -24,6 +24,10 @@ export interface SearchResult {
    *  graça na busca (não custa crédito extra) — mas nem todo site preenche
    *  (paywall/bloqueio → undefined). */
   rawContent?: string;
+  /** Nome do veículo, quando a fonte de busca o fornece explicitamente (ex: tag
+   *  <source> do Google News RSS). Tavily não preenche — a `fonte` é extraída do
+   *  domínio. Usado pra não mostrar "news.google.com" como fonte. */
+  sourceName?: string;
 }
 
 interface TavilyRawResult {

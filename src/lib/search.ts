@@ -19,12 +19,18 @@ export interface SearchResult {
   score: number;
   /** Data de publicação YYYY-MM-DD, quando disponível (topic=news). */
   publishedDate?: string;
+  /** Texto completo extraído da página (include_raw_content). Mais "sujo" que o
+   *  `content` (que é resumo NLP), mas é a matéria-prima pro corpo denso. Vem de
+   *  graça na busca (não custa crédito extra) — mas nem todo site preenche
+   *  (paywall/bloqueio → undefined). */
+  rawContent?: string;
 }
 
 interface TavilyRawResult {
   title?: string;
   url?: string;
   content?: string;
+  raw_content?: string;
   score?: number;
   published_date?: string;
 }
@@ -76,7 +82,10 @@ export async function tavilySearch(
       search_depth: 'basic',
       max_results: maxResults,
       include_answer: false,
-      include_raw_content: false,
+      // Texto completo da página vem junto SEM custo extra de crédito (o custo é
+      // só do search_depth). Alimenta o corpo denso; o `content` (resumo NLP)
+      // continua sendo o sinal limpo pra seleção. Nem todo site preenche.
+      include_raw_content: true,
     };
     // `days` só é válido pra topic=news
     if (topic === 'news') body.days = days;
@@ -107,6 +116,7 @@ export async function tavilySearch(
         title: r.title!.trim(),
         url: r.url!.trim(),
         content: (r.content ?? '').trim(),
+        rawContent: (r.raw_content ?? '').trim() || undefined,
         score: typeof r.score === 'number' ? r.score : 0,
         publishedDate: normalizeDate(r.published_date),
       }));
@@ -141,4 +151,60 @@ export async function tavilySearchMany(
 
   // Ordena por score desc
   return [...byUrl.values()].sort((a, b) => b.score - a.score);
+}
+
+const TAVILY_EXTRACT_ENDPOINT = 'https://api.tavily.com/extract';
+const EXTRACT_TIMEOUT_MS = 15000;
+
+/**
+ * Extrai o texto completo de uma lista de URLs via endpoint /extract da Tavily.
+ *
+ * Por quê: a busca `topic:news` + `include_domains` (usada pra perfis pt) NÃO
+ * retorna `raw_content` (quirk do Tavily) — só metadados + snippet. O /extract
+ * recupera o texto real sob demanda. Custo: 0,2 crédito por URL (basic), só cobra
+ * extração bem-sucedida. Aceita até 20 URLs por chamada — fazemos em lotes de 20.
+ *
+ * Fail-soft: erro/timeout devolve o que já deu certo (Map vazio no pior caso) —
+ * o corpo cai pro snippet, nunca derruba a curadoria.
+ */
+export async function tavilyExtract(urls: string[]): Promise<Map<string, string>> {
+  const out = new Map<string, string>();
+  const apiKey = process.env.TAVILY_API_KEY;
+  if (!apiKey || urls.length === 0) return out;
+
+  const BATCH = 20;
+  for (let i = 0; i < urls.length; i += BATCH) {
+    const batch = urls.slice(i, i + BATCH);
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), EXTRACT_TIMEOUT_MS);
+    try {
+      const res = await fetch(TAVILY_EXTRACT_ENDPOINT, {
+        method: 'POST',
+        signal: controller.signal,
+        headers: {
+          'content-type': 'application/json',
+          authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({ urls: batch, extract_depth: 'basic', include_images: false }),
+      });
+      if (!res.ok) {
+        const text = await res.text().catch(() => '');
+        console.warn(`[tavily-extract] HTTP ${res.status}: ${text.slice(0, 200)}`);
+        continue;
+      }
+      const data = (await res.json()) as {
+        results?: Array<{ url?: string; raw_content?: string }>;
+      };
+      for (const r of data.results ?? []) {
+        const content = (r.raw_content ?? '').trim();
+        if (r.url && content) out.set(r.url.trim(), content);
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.warn(`[tavily-extract] erro no lote: ${msg}`);
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+  return out;
 }

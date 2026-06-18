@@ -65,12 +65,17 @@ export function buildCurateFromResultsPrompt(
 
   const system = SYSTEM_BY_LOCALE[locale];
 
+  // `Trecho` = resumo NLP (sinal limpo pra SELEÇÃO). `Conteúdo` = texto real da
+  // página (matéria-prima pro corpo denso) — vem do include_raw_content, truncado;
+  // nem todo resultado preenche (paywall/bloqueio).
+  const RAW_CHARS = 1800;
   const resultsList = results
     .map((r, i) => {
       const date = r.publishedDate ? ` | publicado: ${r.publishedDate}` : '';
+      const full = r.rawContent ? `\n    Conteúdo: ${r.rawContent.slice(0, RAW_CHARS)}` : '';
       return `[${i + 1}] ${r.title}
     URL: ${r.url}${date}
-    Trecho: ${r.content.slice(0, 500)}`;
+    Trecho: ${r.content.slice(0, 500)}${full}`;
     })
     .join('\n\n');
 
@@ -100,7 +105,7 @@ INSTRUÇÕES:
   * url: COPIE EXATAMENTE de um resultado acima. Proibido modificar.
   * data_publicacao: copie EXATAMENTE a data "publicado" do resultado de busca. Se o resultado não tiver data, tente inferir do título/trecho. Se não conseguir inferir com segurança, escreva null — NÃO invente data.
   * relevancia: "Alta" ou "Média".
-  * corpo: 6 a 10 linhas, denso, na SUA VOZ de amigo. ENTREGUE A INFORMAÇÃO, não a anuncie: extraia os fatos concretos do trecho (números, nomes, datas, valores, o que aconteceu e as implicações) e escreva-os direto, como se o leitor NÃO fosse abrir o link. ⚠️ PROIBIDO referenciar a matéria ou o ato de ler — nada de "a matéria traz", "veja na matéria", "o artigo explica", "confira no link", "fique ligado", "saiba mais": isso transforma o corpo em chamada de clique, o oposto do que queremos. O link existe só pra quem quiser conferir a fonte; o corpo já tem que ser suficiente. Autocontido: o leitor entende o assunto inteiro sem clicar. NÃO invente fatos além do trecho. Texto puro, SEM HTML.
+  * corpo: 6 a 10 linhas, denso, na SUA VOZ de amigo. ENTREGUE A INFORMAÇÃO, não a anuncie: extraia os fatos concretos do "Conteúdo" (e do "Trecho") — números, nomes, datas, valores, o que aconteceu e as implicações — e escreva-os direto, como se o leitor NÃO fosse abrir o link. Quando houver "Conteúdo", use-o como fonte principal dos fatos (é o texto real da matéria); só não invente nada além do que está ali. ⚠️ PROIBIDO referenciar a matéria ou o ato de ler — nada de "a matéria traz", "veja na matéria", "o artigo explica", "confira no link", "fique ligado", "saiba mais": isso transforma o corpo em chamada de clique, o oposto do que queremos. O link existe só pra quem quiser conferir a fonte; o corpo já tem que ser suficiente. Autocontido: o leitor entende o assunto inteiro sem clicar. NÃO invente fatos além do trecho. Texto puro, SEM HTML.
 - 🙅 NÃO repita o perfil do leitor a cada item. A relevância já está na SELEÇÃO — você só escolheu o que importa pra ele, não precisa lembrá-lo do que ele faz o tempo todo. PROIBIDO abrir ou encerrar itens com "Para você que é/trabalha com…", "Como [profissão], você…", "Para quem trabalha com…" e variações. No MÁXIMO UM item por edição pode amarrar explicitamente à profissão/momento/objetivo do leitor — e só quando agrega de verdade. Nos demais, deixe a relevância implícita: escreva a informação boa e confie que ela fala por si.
 - Se NENHUM resultado for relevante, retorne "itens": [].
 

@@ -2,7 +2,7 @@ import { getProvider, extractJson } from './providers';
 import { buildCurateFromResultsPrompt, buildSearchQueries } from '../prompts/curate';
 import { calculateCost } from './pricing';
 import { validateSelectedLeniently, type DroppedItem } from './url-validation';
-import { tavilySearchMany } from './search';
+import { tavilySearchMany, tavilyExtract } from './search';
 import { renderEmailHtml } from './email-template';
 import type { Profile, Briefing, BriefingItem, EmailOutput } from './types';
 import { frequenciaParaJanela } from './types';
@@ -193,6 +193,37 @@ export async function generateBriefing(
         searchResultCount: 0,
       },
     };
+  }
+
+  // --- Passo 1.5: enriquecer com texto completo (raw_content) pra corpo denso.
+  //     A busca news+domínios (perfis pt) NÃO retorna raw_content (quirk do
+  //     Tavily), só snippet — então extraímos sob demanda os TOP candidatos por
+  //     score (rawResults já vem ordenado por score desc) que vieram SEM texto.
+  //     en/es e o fallback global já trazem raw_content de graça na busca, então
+  //     não pagamos /extract por eles. Limita a itemsMax+5 pra bound de custo
+  //     (~0,2 crédito/URL): o LLM seleciona dos mais bem ranqueados de qualquer
+  //     forma. Fail-soft: sem texto, o corpo cai pro snippet. ---
+  const extractCandidates =
+    process.env.SKIP_EXTRACT === '1'
+      ? []
+      : rawResults
+          .filter((r) => !r.rawContent)
+          .slice(0, janela.itemsMax + 5)
+          .map((r) => r.url);
+  if (extractCandidates.length > 0) {
+    const tExtract = Date.now();
+    const extracted = await tavilyExtract(extractCandidates);
+    let enriched = 0;
+    for (const r of rawResults) {
+      const raw = extracted.get(r.url);
+      if (raw && !r.rawContent) {
+        r.rawContent = raw;
+        enriched++;
+      }
+    }
+    console.log(
+      `[timing] Tavily extract (${extractCandidates.length} URLs → ${enriched} ok): ${((Date.now() - tExtract) / 1000).toFixed(1)}s | total ${since()}`,
+    );
   }
 
   // --- Passo 2: curadoria via LLM (sem web search). DeepSeek escolhe dos

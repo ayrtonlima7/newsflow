@@ -271,7 +271,11 @@ export async function generateBriefing(
   // Itens datados-frescos são preferidos; os sem data entram só como PREENCHIMENTO
   // até atingir itemsMin (evita ensaio atemporal dominar a edição, mas mantém
   // recall em dia fraco). Em dia cheio (datados >= itemsMin), os sem data caem.
-  const freshItems = [...datedFresh];
+  //
+  // Preferência por RECÊNCIA: datados do mais novo pro mais antigo (sem isso o
+  // frescor era keep/drop binário e um item de 3 dias com score alto da Tavily
+  // aparecia acima de uma notícia de hoje). Os sem-data ficam por último.
+  const freshItems = sortByRecencyDesc(datedFresh);
   let undatedKept = 0;
   if (freshItems.length < janela.itemsMin && undated.length > 0) {
     undatedKept = Math.min(janela.itemsMin - freshItems.length, undated.length);
@@ -363,6 +367,18 @@ export function filterByFreshness(
   }
 
   return { datedFresh, undated, staleDropped };
+}
+
+/**
+ * Ordena itens do mais novo pro mais antigo (preferência por recência).
+ * `data_publicacao` é YYYY-MM-DD → comparação lexicográfica = cronológica.
+ * Pura/determinística: itens sem data ou malformados afundam pro fim (string
+ * vazia/inválida perde no localeCompare). Não muta a entrada.
+ */
+export function sortByRecencyDesc<T extends { data_publicacao: string }>(itens: T[]): T[] {
+  return [...itens].sort((a, b) =>
+    (b.data_publicacao ?? '').localeCompare(a.data_publicacao ?? ''),
+  );
 }
 
 /**

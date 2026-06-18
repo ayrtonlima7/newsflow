@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { filterByFreshness, dedupeItems } from './pipeline';
+import { filterByFreshness, dedupeItems, sortByRecencyDesc } from './pipeline';
 import type { BriefingItem } from './types';
 
 function item(titulo: string, data_publicacao: string): BriefingItem {
@@ -34,6 +34,32 @@ describe('filterByFreshness', () => {
     const r = filterByFreshness([item('x', '')], cutoff);
     expect(r.staleDropped).toHaveLength(0);
     expect(r.undated).toHaveLength(1);
+  });
+});
+
+describe('sortByRecencyDesc', () => {
+  it('ordena do mais novo pro mais antigo', () => {
+    const out = sortByRecencyDesc([
+      item('antigo', '2026-06-01'),
+      item('novo', '2026-06-18'),
+      item('meio', '2026-06-10'),
+    ]);
+    expect(out.map((i) => i.titulo)).toEqual(['novo', 'meio', 'antigo']);
+  });
+
+  it('afunda itens sem data pro fim', () => {
+    const out = sortByRecencyDesc([
+      item('sem-data', ''),
+      item('datado', '2026-06-15'),
+    ]);
+    expect(out.map((i) => i.titulo)).toEqual(['datado', 'sem-data']);
+  });
+
+  it('não muta a entrada', () => {
+    const entrada = [item('a', '2026-06-01'), item('b', '2026-06-18')];
+    const copia = [...entrada];
+    sortByRecencyDesc(entrada);
+    expect(entrada.map((i) => i.titulo)).toEqual(copia.map((i) => i.titulo));
   });
 });
 

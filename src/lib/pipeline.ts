@@ -263,6 +263,12 @@ export async function generateBriefing(
   }
   const briefing = extractJson<Briefing>(result.text);
 
+  // --- Sanitiza o corpo: tira qualquer URL/link que o LLM tenha enfiado no texto
+  //     (o link vai num botão separado no template). Trava à prova de LLM. ---
+  for (const item of briefing.itens ?? []) {
+    if (item?.corpo) item.corpo = sanitizeCorpo(item.corpo);
+  }
+
   // --- Garantia anti-alucinação: só aceita itens com URL presente nos resultados ---
   const allowedUrls = new Set(rawResults.map((r) => r.url));
   const beforeCount = briefing.itens.length;
@@ -424,6 +430,23 @@ export function sortByRecencyDesc<T extends { data_publicacao: string }>(itens: 
   return [...itens].sort((a, b) =>
     (b.data_publicacao ?? '').localeCompare(a.data_publicacao ?? ''),
   );
+}
+
+/**
+ * Remove qualquer URL/link do corpo. O link é renderizado pelo template num
+ * botão separado — o LLM às vezes ainda anexa "Link: https://..." ou a URL solta
+ * no fim do texto (apesar da regra no prompt). Trava à prova de LLM: tira linhas
+ * rótulo (Link:/URL:/Fonte: http…) + URLs cruas, e limpa as quebras sobrando.
+ */
+export function sanitizeCorpo(corpo: string): string {
+  if (!corpo) return '';
+  return corpo
+    .replace(/^\s*(link|url|fonte(\s+original)?)\s*:\s*https?:\/\/\S+\s*$/gim, '')
+    .replace(/https?:\/\/\S+/gi, '')
+    .replace(/^\s*(link|url|fonte)\s*:\s*$/gim, '')
+    .replace(/[ \t]+\n/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
 }
 
 /**

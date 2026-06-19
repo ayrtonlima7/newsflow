@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { filterByFreshness, dedupeItems, sortByRecencyDesc } from './pipeline';
+import { filterByFreshness, dedupeItems, sortByRecencyDesc, sanitizeCorpo } from './pipeline';
 import type { BriefingItem } from './types';
 
 function item(titulo: string, data_publicacao: string): BriefingItem {
@@ -60,6 +60,27 @@ describe('sortByRecencyDesc', () => {
     const copia = [...entrada];
     sortByRecencyDesc(entrada);
     expect(entrada.map((i) => i.titulo)).toEqual(copia.map((i) => i.titulo));
+  });
+});
+
+describe('sanitizeCorpo', () => {
+  it('remove linha "Link: <url>" no fim do corpo', () => {
+    const out = sanitizeCorpo('Texto do corpo aqui.\nLink: https://ex.com/artigo');
+    expect(out).toBe('Texto do corpo aqui.');
+  });
+
+  it('remove URL solta e rótulo Fonte: http', () => {
+    expect(sanitizeCorpo('Fato relevante.\n\nFonte: https://g1.globo.com/x')).toBe('Fato relevante.');
+    expect(sanitizeCorpo('Veja em https://ex.com agora')).toBe('Veja em  agora');
+  });
+
+  it('não mexe em corpo sem URL', () => {
+    const c = 'Um corpo denso, com números (R$ 3,5 mi) e sem links.';
+    expect(sanitizeCorpo(c)).toBe(c);
+  });
+
+  it('lida com vazio', () => {
+    expect(sanitizeCorpo('')).toBe('');
   });
 });
 

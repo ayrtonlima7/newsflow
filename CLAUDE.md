@@ -84,8 +84,8 @@ Curate and email generation were **merged into a single LLM call** (was 2). `gen
 
 | `frequencia` | base | janelaDias (base + grace) | itemsMin–Max |
 |---|---|---|---|
-| "Todo dia" (daily) | 1 | 4 | 5–8 |
-| "A cada 3 dias" | 3 | 6 | 7–10 |
+| "Todo dia" (daily) | 1 | 4 | 5–10 |
+| "A cada 3 dias" | 3 | 6 | 7–15 |
 | "Uma vez por semana" | 7 | 10 | 10–15 |
 
 `janelaDias` = cadence base + `GRACE_DIAS` (3), and feeds both Tavily's `days` and the freshness cutoff. The grace exists because a strict 24h window (daily) plus the timezone slop in Tavily's `published_date` was dropping most fresh items → near-empty briefings; the freshness filter is a backstop against *very old* content, not a precise recency gate. Item counts (driven by the base cadence) scale so frequent emails are leaner, spaced ones denser.

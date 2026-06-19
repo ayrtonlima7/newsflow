@@ -119,7 +119,7 @@ export function frequenciaParaJanela(frequencia: string): JanelaFrescor {
   // Quantidades incluem buffer pra validação dropar alguns; usuário recebe ~60-80%.
   let baseDias = 1;
   let itemsMin = 5;
-  let itemsMax = 8;
+  let itemsMax = 10;
 
   if (slug === 'weekly') {
     baseDias = 7;
@@ -128,7 +128,7 @@ export function frequenciaParaJanela(frequencia: string): JanelaFrescor {
   } else if (slug === 'every3days') {
     baseDias = 3;
     itemsMin = 7;
-    itemsMax = 10;
+    itemsMax = 15;
   }
 
   // Folga sobre a janela-base. O backstop de frescor existe pra cortar conteúdo

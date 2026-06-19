@@ -151,7 +151,7 @@ export async function generateBriefing(
     const restrictedDomains = resolveDomains(profile, locale);
     rawResults = await tavilySearchMany(queries, {
       days: janela.janelaDias,
-      maxResults: 8,
+      maxResults: 12,
       topic: 'news',
       includeDomains: restrictedDomains,
     });
@@ -167,7 +167,7 @@ export async function generateBriefing(
       );
       const globalResults = await tavilySearchMany(queries, {
         days: janela.janelaDias,
-        maxResults: 8,
+        maxResults: 12,
         topic: 'news',
       });
       const seenUrls = new Set(rawResults.map((r) => r.url));

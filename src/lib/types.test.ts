@@ -5,19 +5,19 @@ import { frequenciaParaJanela } from './types';
 const GRACE = 3;
 
 describe('frequenciaParaJanela', () => {
-  it('daily → base 1, janela base 1 + folga, 5-8 itens', () => {
+  it('daily → base 1, janela base 1 + folga, 5-10 itens', () => {
     const j = frequenciaParaJanela('daily');
     expect(j.baseDias).toBe(1); // cadência-base = cooldown do "Gerar agora"
     expect(j.janelaDias).toBe(1 + GRACE);
     expect(j.itemsMin).toBe(5);
-    expect(j.itemsMax).toBe(8);
+    expect(j.itemsMax).toBe(10);
   });
-  it('every3days → base 3, janela base 3 + folga, 7-10 itens', () => {
+  it('every3days → base 3, janela base 3 + folga, 7-15 itens', () => {
     const j = frequenciaParaJanela('every3days');
     expect(j.baseDias).toBe(3);
     expect(j.janelaDias).toBe(3 + GRACE);
     expect(j.itemsMin).toBe(7);
-    expect(j.itemsMax).toBe(10);
+    expect(j.itemsMax).toBe(15);
   });
   it('weekly → base 7, janela base 7 + folga, 10-15 itens', () => {
     const j = frequenciaParaJanela('weekly');

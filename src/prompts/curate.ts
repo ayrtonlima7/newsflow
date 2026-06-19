@@ -102,10 +102,10 @@ INSTRUÇÕES:
 - "assunto": específico, mencione os temas do dia. Nunca genérico. Ex (no idioma de saída): "${SUBJECT_EXAMPLE[locale]}".
 - "intro": 1-2 frases de abertura.${p.nome ? ` Comece com "${GREETING[locale]} ${p.nome}," ou variação natural.` : ''} Diga o que está rolando no mundo relevante pra essa pessoa hoje.
 - Para cada item:
+  * id: o NÚMERO do resultado escolhido — o [N] que aparece antes do título na lista acima (ex: se escolheu "[7] ...", id = 7). NÃO escreva URL; é só o número. Cada item DEVE ter um id de um resultado real da lista.
   * titulo: claro e fiel ao conteúdo.
   * fonte: nome do veículo — use a "Fonte" fornecida quando houver; senão extraia do domínio da URL.
-  * url: COPIE EXATAMENTE de um resultado acima. Proibido modificar.
-  * data_publicacao: copie EXATAMENTE a data "publicado" do resultado de busca. Se o resultado não tiver data, tente inferir do título/trecho. Se não conseguir inferir com segurança, escreva null — NÃO invente data.
+  * data_publicacao: copie EXATAMENTE a data "publicado" do resultado escolhido. Se o resultado não tiver data, tente inferir do título/trecho. Se não conseguir inferir com segurança, escreva null — NÃO invente data.
   * relevancia: "Alta" ou "Média" para itens sobre os "topicos"; "Baixa" SOMENTE para itens de preenchimento por área (ver regra de PREENCHIMENTO acima).
   * corpo: 6 a 10 linhas, denso, na SUA VOZ de amigo. ENTREGUE A INFORMAÇÃO, não a anuncie: extraia os fatos concretos do "Conteúdo" (e do "Trecho") — números, nomes, datas, valores, o que aconteceu e as implicações — e escreva-os direto, como se o leitor NÃO fosse abrir o link. Quando houver "Conteúdo", use-o como fonte principal dos fatos (é o texto real da matéria). ⚠️ ANTI-INVENÇÃO (regra dura): você SÓ pode afirmar o que está no "Conteúdo"/"Trecho". É PROIBIDO inventar números, valores, idades, datas, placares, nomes, citações ou qualquer detalhe que não esteja ali. Se você só tem o TÍTULO (sem "Conteúdo" e com "Trecho" curto), NÃO encha 6-10 linhas: escreva um corpo CURTO (2-4 linhas) que contextualize honestamente só o que o título afirma. Melhor 2 linhas verdadeiras do que 8 inventadas — fato fabricado é o pior erro possível neste produto. ⚠️ PROIBIDO referenciar a matéria ou o ato de ler — nada de "a matéria traz", "veja na matéria", "o artigo explica", "confira no link", "fique ligado", "saiba mais": isso transforma o corpo em chamada de clique, o oposto do que queremos. ⚠️ NUNCA escreva a URL nem o link no corpo (nem "Link:", nem "Fonte: http...", nem a URL solta) — o link é mostrado pelo sistema num BOTÃO separado. O corpo é só o texto. Autocontido: o leitor entende o assunto inteiro sem clicar. NÃO invente fatos além do trecho. Texto puro, SEM HTML.
 - 🙅 NÃO repita o perfil do leitor a cada item. A relevância já está na SELEÇÃO — você só escolheu o que importa pra ele, não precisa lembrá-lo do que ele faz o tempo todo. PROIBIDO abrir ou encerrar itens com "Para você que é/trabalha com…", "Como [profissão], você…", "Para quem trabalha com…" e variações. No MÁXIMO UM item por edição pode amarrar explicitamente à profissão/momento/objetivo do leitor — e só quando agrega de verdade. Nos demais, deixe a relevância implícita: escreva a informação boa e confie que ela fala por si.
@@ -118,9 +118,9 @@ RESPONDA APENAS COM UM JSON VÁLIDO, sem markdown, sem texto antes ou depois:
   "intro": "",
   "itens": [
     {
+      "id": 0,
       "titulo": "",
       "fonte": "",
-      "url": "(copiada EXATAMENTE de um resultado acima)",
       "data_publicacao": "YYYY-MM-DD",
       "relevancia": "Alta",
       "corpo": ""

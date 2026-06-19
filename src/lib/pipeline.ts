@@ -132,49 +132,65 @@ export async function generateBriefing(
   const t0 = Date.now();
   const since = () => `${((Date.now() - t0) / 1000).toFixed(1)}s`;
 
-  // --- Passo 1: busca real. Fonte selecionável por env SEARCH_PROVIDER:
-  //     'rss' = Google News RSS (datado, cobre nicho/local que o Tavily não pega);
-  //     qualquer outro / ausente = Tavily (default). ---
-  const searchProvider = process.env.SEARCH_PROVIDER === 'rss' ? 'rss' : 'tavily';
+  // --- Passo 1: busca real. SEARCH_PROVIDER: 'tavily' (só Tavily, kill-switch) |
+  //     'rss' (só Google News RSS) | ausente/'merge' = FAN-OUT (default): roda as
+  //     duas fontes e mescla. Tavily traz corpo extraível (tópico amplo); o RSS
+  //     cobre nicho/local DATADO que o Tavily não pega e engrossa o pool — de
+  //     graça (sem chave). Mais candidatos ⇒ diário enche melhor + frescor real. ---
+  const searchProvider =
+    process.env.SEARCH_PROVIDER === 'tavily' || process.env.SEARCH_PROVIDER === 'rss'
+      ? process.env.SEARCH_PROVIDER
+      : 'merge';
   const queries = buildSearchQueries(profile, locale);
   if (queries.length === 0) {
     throw new Error('curate: nenhuma query de busca derivada do perfil');
   }
-  const tSearch = Date.now();
-  let rawResults: SearchResult[];
-  if (searchProvider === 'rss') {
-    rawResults = await googleNewsSearchMany(queries, { days: janela.janelaDias, maxResults: 12 }, locale);
-    console.log(
-      `[timing] Google News RSS (${queries.length} queries): ${((Date.now() - tSearch) / 1000).toFixed(1)}s → ${rawResults.length} resultados | total ${since()}`,
-    );
-  } else {
+
+  const searchTavily = async (): Promise<SearchResult[]> => {
     const restrictedDomains = resolveDomains(profile, locale);
-    rawResults = await tavilySearchMany(queries, {
+    let res = await tavilySearchMany(queries, {
       days: janela.janelaDias,
       maxResults: 12,
       topic: 'news',
       includeDomains: restrictedDomains,
     });
-    // Fallback: se a busca foi restrita a domínios (perfis pt) e veio MUITO pouco,
-    // refaz SEM restrição (global) e mescla — tópicos internacionais/de nicho (ex:
-    // ferramentas de produção musical, libs estrangeiras) não têm cobertura nos
-    // sites de notícia BR, e a restrição sozinha devolvia briefing VAZIO. Mantém a
-    // preferência BR (resultados restritos vêm primeiro) e só dispara quando faltou
-    // conteúdo de verdade (< itemsMin) — não penaliza o usuário BR comum.
-    if (restrictedDomains && rawResults.length < janela.itemsMin) {
+    // Fallback: busca restrita a domínios (pt) veio MUITO pouco → refaz SEM
+    // restrição (global) e mescla (preferência BR primeiro). Só dispara quando
+    // faltou conteúdo de verdade — nicho internacional não tem cobertura BR.
+    if (restrictedDomains && res.length < janela.itemsMin) {
       console.warn(
-        `[curate] busca restrita a domínios devolveu ${rawResults.length} (< itemsMin ${janela.itemsMin}) — refazendo SEM restrição de domínio (fallback global)`,
+        `[curate] busca restrita a domínios devolveu ${res.length} (< itemsMin ${janela.itemsMin}) — refazendo SEM restrição (fallback global)`,
       );
-      const globalResults = await tavilySearchMany(queries, {
-        days: janela.janelaDias,
-        maxResults: 12,
-        topic: 'news',
-      });
-      const seenUrls = new Set(rawResults.map((r) => r.url));
-      rawResults = [...rawResults, ...globalResults.filter((r) => !seenUrls.has(r.url))];
+      const global = await tavilySearchMany(queries, { days: janela.janelaDias, maxResults: 12, topic: 'news' });
+      const seen = new Set(res.map((r) => r.url));
+      res = [...res, ...global.filter((r) => !seen.has(r.url))];
     }
+    return res;
+  };
+  const searchRss = (): Promise<SearchResult[]> =>
+    googleNewsSearchMany(queries, { days: janela.janelaDias, maxResults: 10 }, locale);
+
+  // Teto do pool mesclado pra não estourar o prompt do LLM (Tavily score-desc
+  // primeiro, RSS data-desc depois → o extract pega os top Tavily; o resto é oferta).
+  const MERGE_CAP = 50;
+  const tSearch = Date.now();
+  let rawResults: SearchResult[];
+  if (searchProvider === 'tavily') {
+    rawResults = await searchTavily();
     console.log(
-      `[timing] Tavily (${queries.length} queries): ${((Date.now() - tSearch) / 1000).toFixed(1)}s → ${rawResults.length} resultados | total ${since()}`,
+      `[timing] Tavily (${queries.length} queries): ${((Date.now() - tSearch) / 1000).toFixed(1)}s → ${rawResults.length} | total ${since()}`,
+    );
+  } else if (searchProvider === 'rss') {
+    rawResults = await searchRss();
+    console.log(
+      `[timing] Google News RSS (${queries.length} queries): ${((Date.now() - tSearch) / 1000).toFixed(1)}s → ${rawResults.length} | total ${since()}`,
+    );
+  } else {
+    const [tav, rss] = await Promise.all([searchTavily(), searchRss()]);
+    const seen = new Set(tav.map((r) => r.url));
+    rawResults = [...tav, ...rss.filter((r) => !seen.has(r.url))].slice(0, MERGE_CAP);
+    console.log(
+      `[timing] fan-out Tavily(${tav.length})+RSS(${rss.length})→${rawResults.length}/cap${MERGE_CAP}: ${((Date.now() - tSearch) / 1000).toFixed(1)}s | total ${since()}`,
     );
   }
 
@@ -215,13 +231,14 @@ export async function generateBriefing(
   //     não pagamos /extract por eles. Limita a itemsMax+5 pra bound de custo
   //     (~0,2 crédito/URL): o LLM seleciona dos mais bem ranqueados de qualquer
   //     forma. Fail-soft: sem texto, o corpo cai pro snippet. ---
-  // RSS (Google News) devolve links-redirect que o /extract do Tavily não
-  // resolve — pular extração nesse modo (corpo fica no snippet; Tier 1.5 resolve).
+  // Extração só nos itens com URL REAL e sem texto ainda. Links-redirect do Google
+  // News (RSS) o /extract do Tavily não resolve — ficam de fora (corpo no snippet;
+  // Tier 1.5 resolverá o redirect). No modo 'rss' puro, pula tudo.
   const extractCandidates =
     process.env.SKIP_EXTRACT === '1' || searchProvider === 'rss'
       ? []
       : rawResults
-          .filter((r) => !r.rawContent)
+          .filter((r) => !r.rawContent && !r.url.includes('news.google.com'))
           .slice(0, janela.itemsMax + 5)
           .map((r) => r.url);
   if (extractCandidates.length > 0) {
@@ -269,13 +286,25 @@ export async function generateBriefing(
     if (item?.corpo) item.corpo = sanitizeCorpo(item.corpo);
   }
 
-  // --- Garantia anti-alucinação: só aceita itens com URL presente nos resultados ---
-  const allowedUrls = new Set(rawResults.map((r) => r.url));
+  // --- Resolução por ÍNDICE (anti-alucinação): o LLM escolhe pelo número [N] do
+  //     resultado (id), não copiando URL — isso elimina o erro de copiar URLs
+  //     longas (redirects do Google News/RSS) que antes caíam como "alucinadas".
+  //     O código resolve id → resultado real e preenche url/fonte/data dali
+  //     (ground truth). Item com id inválido é descartado. ---
   const beforeCount = briefing.itens.length;
   briefing.itens = briefing.itens.filter((item) => {
-    if (allowedUrls.has(item.url)) return true;
-    console.warn(`[curate] item descartado (URL inventada, fora dos resultados): "${item.titulo}" → ${item.url}`);
-    return false;
+    const id = (item as { id?: number }).id;
+    const src =
+      typeof id === 'number' && id >= 1 && id <= rawResults.length ? rawResults[id - 1] : undefined;
+    if (!src) {
+      console.warn(`[curate] item descartado (id inválido: ${JSON.stringify(id)}): "${item.titulo}"`);
+      return false;
+    }
+    item.url = src.url;
+    if (src.sourceName) item.fonte = src.sourceName; // fonte real (ex: <source> do RSS)
+    if (src.publishedDate) item.data_publicacao = src.publishedDate; // data ground-truth
+    delete (item as { id?: number }).id;
+    return true;
   });
   const hallucinatedUrlsDropped = beforeCount - briefing.itens.length;
 
@@ -289,26 +318,8 @@ export async function generateBriefing(
     console.warn(`[curate] ${dupDropped} item(s) duplicado(s) removido(s) (mesma URL/título no mesmo briefing)`);
   }
 
-  // --- Cross-validação de datas contra os resultados Tavily (ground truth) ---
-  // Quando o Tavily tem published_date, ELA é a verdade — sobrescreve a data que
-  // o LLM extraiu (que pode estar errada). Quando o Tavily NÃO tem data, deixamos
-  // como está: NÃO anulamos nem descartamos. O item veio de uma busca de NOTÍCIA
-  // limitada por `days` (Tavily já restringiu por janela), e dropar por "sem data"
-  // eliminava justamente as matérias frescas sem carimbo — era a causa do briefing
-  // vir quase vazio. (Itens genuinamente antigos costumam VIR com data no Tavily e
-  // caem no corte de frescor abaixo.)
-  const tavilyDateByUrl = new Map(
-    rawResults.filter((r) => r.publishedDate).map((r) => [r.url, r.publishedDate as string]),
-  );
-  for (const item of briefing.itens) {
-    const realDate = tavilyDateByUrl.get(item.url);
-    if (realDate && item.data_publicacao !== realDate) {
-      console.warn(
-        `[curate] data corrigida (LLM: "${item.data_publicacao}" → Tavily: "${realDate}"): "${item.titulo}"`,
-      );
-      item.data_publicacao = realDate;
-    }
-  }
+  // (A data ground-truth da fonte já foi aplicada na resolução por id acima.
+  // Quando a fonte não tem data, mantém a que o LLM inferiu — não anulamos.)
 
   // --- Frescor: corte estrito (preferência) + degradação graciosa ---
   const fresh0 = filterByFreshness(briefing.itens, janela.cutoffISO);

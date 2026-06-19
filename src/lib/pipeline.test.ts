@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { filterByFreshness, dedupeItems, sortByRecencyDesc, sanitizeCorpo } from './pipeline';
+import { filterByFreshness, dedupeItems, sortByRecencyDesc, sanitizeCorpo, sortForDisplay } from './pipeline';
 import type { BriefingItem } from './types';
 
 function item(titulo: string, data_publicacao: string): BriefingItem {
@@ -60,6 +60,24 @@ describe('sortByRecencyDesc', () => {
     const copia = [...entrada];
     sortByRecencyDesc(entrada);
     expect(entrada.map((i) => i.titulo)).toEqual(copia.map((i) => i.titulo));
+  });
+});
+
+describe('sortForDisplay', () => {
+  const it2 = (titulo: string, data: string, rel: 'Alta' | 'Média' | 'Baixa'): BriefingItem => ({
+    titulo, fonte: 'f', url: `https://ex.com/${titulo}`, data_publicacao: data, relevancia: rel, corpo: 'c',
+  });
+  it('põe preenchimento (Baixa) por último, mesmo se for mais recente', () => {
+    const out = sortForDisplay([
+      it2('fill-novo', '2026-06-19', 'Baixa'),
+      it2('principal-velho', '2026-06-10', 'Alta'),
+      it2('principal-novo', '2026-06-18', 'Média'),
+    ]);
+    expect(out.map((i) => i.titulo)).toEqual(['principal-novo', 'principal-velho', 'fill-novo']);
+  });
+  it('sem itens Baixa, é só recência', () => {
+    const out = sortForDisplay([it2('a', '2026-06-10', 'Alta'), it2('b', '2026-06-18', 'Média')]);
+    expect(out.map((i) => i.titulo)).toEqual(['b', 'a']);
   });
 });
 

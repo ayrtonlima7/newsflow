@@ -62,9 +62,14 @@ describe('buildSearchQueries', () => {
     expect(buildSearchQueries(p, 'pt')).toEqual(['Botafogo Brasileirão notícias']);
   });
 
-  it('cai pro tema quando não há tópicos', () => {
+  it('sem tópicos, amplia com uma query por tema (própria área do usuário)', () => {
     const p = makeProfile({ tema: ['tecnologia', 'startups'] });
-    expect(buildSearchQueries(p, 'pt')).toEqual(['tecnologia startups notícias']);
+    expect(buildSearchQueries(p, 'pt')).toEqual(['tecnologia notícias', 'startups notícias']);
+  });
+
+  it('perfil estreito (poucos tópicos) amplia com o tema amplo', () => {
+    const p = makeProfile({ topicos_busca: ['React Native'], tema: ['Tecnologia'] });
+    expect(buildSearchQueries(p, 'pt')).toEqual(['React Native notícias', 'Tecnologia notícias']);
   });
 
   it('respeita o idioma na palavra de notícia', () => {

@@ -323,10 +323,10 @@ export async function generateBriefing(
   // até atingir itemsMin (evita ensaio atemporal dominar a edição, mas mantém
   // recall em dia fraco). Em dia cheio (datados >= itemsMin), os sem data caem.
   //
-  // Preferência por RECÊNCIA: datados do mais novo pro mais antigo (sem isso o
-  // frescor era keep/drop binário e um item de 3 dias com score alto da Tavily
-  // aparecia acima de uma notícia de hoje). Os sem-data ficam por último.
-  const freshItems = sortByRecencyDesc(datedFresh);
+  // Ordem de exibição: principais por recência, preenchimento-por-área (relevância
+  // "Baixa") por último. Sem isso o frescor era keep/drop binário e um item antigo
+  // com score alto aparecia acima de uma notícia de hoje. Os sem-data ficam no fim.
+  const freshItems = sortForDisplay(datedFresh);
   let undatedKept = 0;
   if (freshItems.length < janela.itemsMin && undated.length > 0) {
     undatedKept = Math.min(janela.itemsMin - freshItems.length, undated.length);
@@ -430,6 +430,18 @@ export function sortByRecencyDesc<T extends { data_publicacao: string }>(itens: 
   return [...itens].sort((a, b) =>
     (b.data_publicacao ?? '').localeCompare(a.data_publicacao ?? ''),
   );
+}
+
+/**
+ * Ordena os itens pra exibição: principais primeiro (relevância Alta/Média),
+ * preenchimento-por-área (relevância "Baixa") POR ÚLTIMO — cada grupo ordenado
+ * por recência. O preenchimento entra só quando faltam itens dos tópicos pra
+ * chegar ao mínimo (são da área ampla do usuário, coerentes mas secundários).
+ */
+export function sortForDisplay(itens: BriefingItem[]): BriefingItem[] {
+  const main = sortByRecencyDesc(itens.filter((i) => i.relevancia !== 'Baixa'));
+  const fill = sortByRecencyDesc(itens.filter((i) => i.relevancia === 'Baixa'));
+  return [...main, ...fill];
 }
 
 /**

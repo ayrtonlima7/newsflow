@@ -54,7 +54,7 @@ export interface Profile {
   dominios_busca?: string[];
 }
 
-export type Relevancia = 'Alta' | 'Média';
+export type Relevancia = 'Alta' | 'Média' | 'Baixa';
 
 export type UrlStatus = 'verified' | 'fallback' | 'source-only';
 

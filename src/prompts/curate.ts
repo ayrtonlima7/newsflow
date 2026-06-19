@@ -97,7 +97,8 @@ INSTRUÇÕES:
 - ⏱️ RECÊNCIA: entre itens igualmente relevantes, SEMPRE prefira o mais recente. Notícia de hoje/ontem ganha de notícia de 3 dias atrás. Só inclua algo com 2+ dias se não houver opção mais fresca e relevante.
 - Use "objetivo" e "contexto" pra calibrar recorte e profundidade. Priorize "topicos" e "referencias". IGNORE o que cai em "ignorar".
 - ⚠️ RELEVÂNCIA É OBRIGATÓRIA: só inclua itens REALMENTE sobre os "tema"/"topicos" do usuário. NUNCA inclua uma notícia que você mesmo descreveria como "não tem relação" / "fora do escopo" (ex: outro esporte, outra liga, política ou país aleatórios) só pra preencher a contagem. É MUITO MELHOR retornar MENOS itens — ou nenhum ("itens": []) — do que encher com conteúdo irrelevante. Não comente itens que você descartou; simplesmente não os inclua.
-- ⚠️ CUIDADO COM MEGA-EVENTOS: assuntos de altíssimo volume (Copa do Mundo, eleição, grande premiação) dominam os resultados de busca e tentam vazar pra QUALQUER perfil. Só inclua um item de mega-evento se ele casar DIRETO com um "tema"/"topico" do usuário. NÃO force a barra ("o usuário curte X, e o mega-evento toca X de leve") — se o tema dele é de nicho e não há notícia fresca dele, retorne MENOS itens em vez de encher com o assunto do momento.
+- ⚠️ CUIDADO COM MEGA-EVENTOS: assuntos de altíssimo volume (Copa do Mundo, eleição, grande premiação) dominam os resultados de busca e tentam vazar pra QUALQUER perfil. Só inclua um item de mega-evento se ele casar DIRETO com um "tema"/"topico" do usuário. NÃO force a barra ("o usuário curte X, e o mega-evento toca X de leve") — se o tema dele é de nicho e não há notícia fresca dele, NÃO encha com o assunto do momento.
+- 📊 PREENCHIMENTO POR ÁREA (quando faltar item dos "topicos"): primeiro escolha os itens diretamente sobre os "topicos" (são os principais). Se NÃO houver itens frescos suficientes nos "topicos" pra chegar ao mínimo, você PODE completar com itens que sejam da MESMA ÁREA AMPLA do usuário — ou seja, dos "tema" dele (ex: se o tema é "Tecnologia", uma notícia tech relevante serve mesmo não sendo do tópico exato). Esses itens de preenchimento: (a) têm que ser coerentes com a área declarada do usuário — NUNCA algo fora dela (outro esporte, assunto aleatório, mega-evento que não casa); (b) marque com "relevancia": "Baixa"; (c) serão exibidos por último. Ainda assim: melhor 1 item a menos que 1 item incoerente.
 - "assunto": específico, mencione os temas do dia. Nunca genérico. Ex (no idioma de saída): "${SUBJECT_EXAMPLE[locale]}".
 - "intro": 1-2 frases de abertura.${p.nome ? ` Comece com "${GREETING[locale]} ${p.nome}," ou variação natural.` : ''} Diga o que está rolando no mundo relevante pra essa pessoa hoje.
 - Para cada item:
@@ -105,7 +106,7 @@ INSTRUÇÕES:
   * fonte: nome do veículo — use a "Fonte" fornecida quando houver; senão extraia do domínio da URL.
   * url: COPIE EXATAMENTE de um resultado acima. Proibido modificar.
   * data_publicacao: copie EXATAMENTE a data "publicado" do resultado de busca. Se o resultado não tiver data, tente inferir do título/trecho. Se não conseguir inferir com segurança, escreva null — NÃO invente data.
-  * relevancia: "Alta" ou "Média".
+  * relevancia: "Alta" ou "Média" para itens sobre os "topicos"; "Baixa" SOMENTE para itens de preenchimento por área (ver regra de PREENCHIMENTO acima).
   * corpo: 6 a 10 linhas, denso, na SUA VOZ de amigo. ENTREGUE A INFORMAÇÃO, não a anuncie: extraia os fatos concretos do "Conteúdo" (e do "Trecho") — números, nomes, datas, valores, o que aconteceu e as implicações — e escreva-os direto, como se o leitor NÃO fosse abrir o link. Quando houver "Conteúdo", use-o como fonte principal dos fatos (é o texto real da matéria). ⚠️ ANTI-INVENÇÃO (regra dura): você SÓ pode afirmar o que está no "Conteúdo"/"Trecho". É PROIBIDO inventar números, valores, idades, datas, placares, nomes, citações ou qualquer detalhe que não esteja ali. Se você só tem o TÍTULO (sem "Conteúdo" e com "Trecho" curto), NÃO encha 6-10 linhas: escreva um corpo CURTO (2-4 linhas) que contextualize honestamente só o que o título afirma. Melhor 2 linhas verdadeiras do que 8 inventadas — fato fabricado é o pior erro possível neste produto. ⚠️ PROIBIDO referenciar a matéria ou o ato de ler — nada de "a matéria traz", "veja na matéria", "o artigo explica", "confira no link", "fique ligado", "saiba mais": isso transforma o corpo em chamada de clique, o oposto do que queremos. ⚠️ NUNCA escreva a URL nem o link no corpo (nem "Link:", nem "Fonte: http...", nem a URL solta) — o link é mostrado pelo sistema num BOTÃO separado. O corpo é só o texto. Autocontido: o leitor entende o assunto inteiro sem clicar. NÃO invente fatos além do trecho. Texto puro, SEM HTML.
 - 🙅 NÃO repita o perfil do leitor a cada item. A relevância já está na SELEÇÃO — você só escolheu o que importa pra ele, não precisa lembrá-lo do que ele faz o tempo todo. PROIBIDO abrir ou encerrar itens com "Para você que é/trabalha com…", "Como [profissão], você…", "Para quem trabalha com…" e variações. No MÁXIMO UM item por edição pode amarrar explicitamente à profissão/momento/objetivo do leitor — e só quando agrega de verdade. Nos demais, deixe a relevância implícita: escreva a informação boa e confie que ela fala por si.
 - Se NENHUM resultado for relevante, retorne "itens": [].
@@ -154,15 +155,28 @@ function withNewsIntent(query: string, locale: Locale): string {
 export function buildSearchQueries(profile: Profile, locale: Locale = 'pt'): string[] {
   const p = profileForPrompt(profile, locale);
   const queries: string[] = [];
+  const push = (q: string) => {
+    const withNews = withNewsIntent(q.trim(), locale);
+    if (q.trim() && !queries.includes(withNews)) queries.push(withNews);
+  };
 
   // Uma query por tópico (são os sinais mais específicos)
-  for (const topico of p.topicos) {
-    if (topico && topico.trim()) queries.push(withNewsIntent(topico.trim(), locale));
+  for (const topico of p.topicos) push(topico);
+
+  // Perfil ESTREITO (poucos tópicos): amplia com o `tema` amplo — a PRÓPRIA área
+  // declarada do usuário, não um tema "parecido" inventado. Mais candidatos
+  // coerentes sem risco de drift. Ex: 2 tópicos de eng. de software → +queries
+  // "Tecnologia"/"Engenharia de software". Só pra encher até ~4 sinais.
+  if (queries.length < 4) {
+    for (const tema of p.tema) {
+      if (queries.length >= 6) break;
+      push(tema);
+    }
   }
 
-  // Se não houver tópicos (raro), cai pro tema
+  // Se ainda não houver nada (raro), cai pro tema concatenado
   if (queries.length === 0 && p.tema.length > 0) {
-    queries.push(withNewsIntent(p.tema.join(' '), locale));
+    push(p.tema.join(' '));
   }
 
   // Cap em 6 queries pra não estourar o free tier da Tavily

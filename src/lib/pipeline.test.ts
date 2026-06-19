@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { filterByFreshness, dedupeItems, sortByRecencyDesc, sanitizeCorpo, sortForDisplay } from './pipeline';
+import { filterByFreshness, dedupeItems, sortByRecencyDesc, sanitizeCorpo, sortForDisplay, reabsorbFromGrace } from './pipeline';
 import type { BriefingItem } from './types';
 
 function item(titulo: string, data_publicacao: string): BriefingItem {
@@ -60,6 +60,37 @@ describe('sortByRecencyDesc', () => {
     const copia = [...entrada];
     sortByRecencyDesc(entrada);
     expect(entrada.map((i) => i.titulo)).toEqual(copia.map((i) => i.titulo));
+  });
+});
+
+describe('reabsorbFromGrace', () => {
+  const drop = (titulo: string, data: string) => ({
+    item: { titulo, fonte: 'f', url: `https://ex.com/${titulo}`, data_publicacao: data, relevancia: 'Alta' as const, corpo: 'c' },
+    reason: 'antigo',
+  });
+  // diário: estrito=ontem (06-18), folga até 06-15
+  const opts = { cutoffISO: '2026-06-18', cutoffGraceISO: '2026-06-15', itemsMin: 3 };
+
+  it('reabsorve da folga (mais novo primeiro) quando faltam recentes', () => {
+    const datedFresh = [item('hoje', '2026-06-19')]; // só 1 recente, min 3
+    const stale = [drop('d16', '2026-06-16'), drop('d17', '2026-06-17'), drop('d13', '2026-06-13')];
+    const r = reabsorbFromGrace(datedFresh, stale, opts);
+    // precisa de +2; pega 06-17 e 06-16 (na folga, mais novos); 06-13 fica stale
+    expect(r.datedFresh.map((i) => i.titulo)).toEqual(['hoje', 'd17', 'd16']);
+    expect(r.trulyStale.map((d) => d.item.titulo)).toEqual(['d13']);
+    expect(r.reabsorbed).toHaveLength(2);
+  });
+
+  it('não reabsorve se já há itens suficientes', () => {
+    const datedFresh = [item('a', '2026-06-19'), item('b', '2026-06-18'), item('c', '2026-06-18')];
+    const r = reabsorbFromGrace(datedFresh, [drop('d16', '2026-06-16')], opts);
+    expect(r.reabsorbed).toHaveLength(0);
+    expect(r.trulyStale).toHaveLength(1);
+  });
+
+  it('não reabsorve quando folga == estrito (cadência espaçada)', () => {
+    const r = reabsorbFromGrace([], [drop('d', '2026-06-16')], { cutoffISO: '2026-06-15', cutoffGraceISO: '2026-06-15', itemsMin: 5 });
+    expect(r.reabsorbed).toHaveLength(0);
   });
 });
 

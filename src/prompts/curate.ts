@@ -86,7 +86,7 @@ ${JSON.stringify(p, null, 2)}
 ⚠️ "descricao_livre" e "referencias" são CONTEXTO pra VOCÊ calibrar profundidade e ESCOLHER os itens — NÃO são coisas pra citar no texto. NÃO faça name-drop da stack, da empresa, do cargo ou dos canais/nomes que aparecem aí (ex: "React Native", "Claude Code", nome do trabalho, gente que ele segue). Use-os só pra decidir o que é relevante e em que nível escrever.
 
 DATA ATUAL: ${janela.todayISO}
-JANELA DE FRESCOR: conteúdo dos últimos ${janela.janelaDias} dias (não inclua nada antes de ${janela.cutoffISO}).
+JANELA DE FRESCOR: ${janela.rotulo} — NÃO inclua NADA publicado antes de ${janela.cutoffISO}. Prefira sempre o mais recente.
 
 RESULTADOS DE BUSCA DISPONÍVEIS (${results.length} itens):
 ${resultsList}

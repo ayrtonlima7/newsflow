@@ -35,11 +35,16 @@ describe('frequenciaParaJanela', () => {
     expect(j.cutoffISO).toMatch(/^\d{4}-\d{2}-\d{2}$/);
     expect(j.cutoffISO < j.todayISO).toBe(true);
   });
-  it('cutoff = hoje − janelaDias (a folga afrouxa o corte)', () => {
+  it('diário: cutoff estrito = ONTEM (ontem + hoje, ~32h), não hoje − janelaDias', () => {
     const j = frequenciaParaJanela('daily');
-    const expected = new Date(Date.now() - j.janelaDias * 86400000)
-      .toISOString()
-      .split('T')[0];
+    const ontem = new Date(Date.now() - 1 * 86400000).toISOString().split('T')[0];
+    expect(j.cutoffISO).toBe(ontem);
+    // janelaDias (busca/dedup) segue com a folga — só o frescor que apertou
+    expect(j.janelaDias).toBe(1 + GRACE);
+  });
+  it('cadências espaçadas mantêm a folga no cutoff (hoje − janelaDias)', () => {
+    const j = frequenciaParaJanela('every3days');
+    const expected = new Date(Date.now() - j.janelaDias * 86400000).toISOString().split('T')[0];
     expect(j.cutoffISO).toBe(expected);
   });
 });

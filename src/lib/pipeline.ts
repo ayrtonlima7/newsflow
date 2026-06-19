@@ -310,11 +310,22 @@ export async function generateBriefing(
     }
   }
 
-  // --- Frescor: backstop usando a data que o modelo extraiu ---
-  const { datedFresh, undated, staleDropped } = filterByFreshness(briefing.itens, janela.cutoffISO);
-  if (staleDropped.length > 0) {
-    console.warn(`[curate] ${staleDropped.length} item(s) descartado(s) por frescor (cutoff ${janela.cutoffISO}):`);
-    for (const d of staleDropped) {
+  // --- Frescor: corte estrito (preferência) + degradação graciosa ---
+  const fresh0 = filterByFreshness(briefing.itens, janela.cutoffISO);
+  const undated = fresh0.undated;
+  const { datedFresh, trulyStale, reabsorbed } = reabsorbFromGrace(
+    fresh0.datedFresh,
+    fresh0.staleDropped,
+    { cutoffISO: janela.cutoffISO, cutoffGraceISO: janela.cutoffGraceISO, itemsMin: janela.itemsMin },
+  );
+  if (reabsorbed.length > 0) {
+    console.log(
+      `[curate] frescor: ${reabsorbed.length} item(s) reabsorvido(s) da folga (poucos recentes; estrito ${janela.cutoffISO}, folga até ${janela.cutoffGraceISO})`,
+    );
+  }
+  if (trulyStale.length > 0) {
+    console.warn(`[curate] ${trulyStale.length} item(s) descartado(s) por frescor (cutoff ${janela.cutoffISO}):`);
+    for (const d of trulyStale) {
       console.warn(`  - "${d.item.titulo}" → ${d.reason}`);
     }
   }
@@ -356,7 +367,7 @@ export async function generateBriefing(
 
   const cost = calculateCost(provider.model, result.usage);
   console.log(
-    `[curate] final: ${briefing.itens.length} item(s) | search→${rawResults.length}, IA selecionou→${beforeCount}, alucinadas→${hallucinatedUrlsDropped}, dup→${dupDropped}, stale→${staleDropped.length}, sem-data-dropados→${undatedDropped}, link-morto→${deadDropped.length}`,
+    `[curate] final: ${briefing.itens.length} item(s) | search→${rawResults.length}, IA selecionou→${beforeCount}, alucinadas→${hallucinatedUrlsDropped}, dup→${dupDropped}, stale→${trulyStale.length}, reabsorvidos→${reabsorbed.length}, sem-data-dropados→${undatedDropped}, link-morto→${deadDropped.length}`,
   );
 
   return {
@@ -418,6 +429,34 @@ export function filterByFreshness(
   }
 
   return { datedFresh, undated, staleDropped };
+}
+
+/**
+ * Degradação graciosa do frescor. O `cutoffISO` (estrito) é a PREFERÊNCIA; se os
+ * itens recentes não chegam a `itemsMin`, reabsorve os descartados que estão na
+ * janela de folga (entre `cutoffGraceISO` e `cutoffISO`), mais novos primeiro, até
+ * o mínimo. Evita email vazio em dia magro sem afrouxar o frescor em dia cheio.
+ * Quando `cutoffGraceISO == cutoffISO` (cadências espaçadas) ou já há itens
+ * suficientes, não reabsorve nada. Pura: não muta as entradas.
+ */
+export function reabsorbFromGrace(
+  datedFresh: BriefingItem[],
+  staleDropped: DroppedItem[],
+  opts: { cutoffISO: string; cutoffGraceISO: string; itemsMin: number },
+): { datedFresh: BriefingItem[]; trulyStale: DroppedItem[]; reabsorbed: BriefingItem[] } {
+  if (datedFresh.length >= opts.itemsMin || opts.cutoffGraceISO >= opts.cutoffISO) {
+    return { datedFresh, trulyStale: staleDropped, reabsorbed: [] };
+  }
+  const reabsorbivel = staleDropped
+    .filter((d) => d.item.data_publicacao >= opts.cutoffGraceISO)
+    .sort((a, b) => b.item.data_publicacao.localeCompare(a.item.data_publicacao));
+  const reabsorbed = reabsorbivel.slice(0, opts.itemsMin - datedFresh.length).map((d) => d.item);
+  const set = new Set(reabsorbed);
+  return {
+    datedFresh: [...datedFresh, ...reabsorbed],
+    trulyStale: staleDropped.filter((d) => !set.has(d.item)),
+    reabsorbed,
+  };
 }
 
 /**

@@ -100,8 +100,13 @@ export interface JanelaFrescor {
   rotulo: string;
   /** Hoje no formato YYYY-MM-DD. */
   todayISO: string;
-  /** Data limite em YYYY-MM-DD — tudo publicado antes disso é rejeitado. */
+  /** Data limite de FRESCOR em YYYY-MM-DD — preferência. Tudo antes disso só entra
+   *  via reabsorção (degradação graciosa) se faltar conteúdo recente. Diário = ontem. */
   cutoffISO: string;
+  /** Limite de REABSORÇÃO (= hoje − janelaDias). Em dia magro o pipeline reaproveita
+   *  itens entre cutoffISO e este limite em vez de mandar email vazio. Pro diário é o
+   *  reach-back de 2-4 dias; pras outras cadências é igual a cutoffISO. */
+  cutoffGraceISO: string;
   /** Mínimo de itens pedido ao modelo. Inclui buffer pra validação derrubar alguns. */
   itemsMin: number;
   /** Máximo de itens pedido ao modelo. */
@@ -131,20 +136,31 @@ export function frequenciaParaJanela(frequencia: string): JanelaFrescor {
     itemsMax = 15;
   }
 
-  // Folga sobre a janela-base. O backstop de frescor existe pra cortar conteúdo
-  // MUITO antigo (semanas/anos) — não pra aparar notícia de 2-3 dias. Sem a folga,
-  // a janela diária (24h) somada ao slop de fuso do published_date da Tavily
-  // derrubava a maioria dos itens frescos e o briefing vinha quase vazio. A folga
-  // também alimenta a busca (Tavily.days) pra garantir oferta em dias de pouca notícia.
+  // `janelaDias` (busca Tavily.days + janela de dedup entre edições): base + folga.
+  // A folga garante OFERTA de candidatos em dia de pouca notícia (busca larga).
   const GRACE_DIAS = 3;
   const janelaDias = baseDias + GRACE_DIAS;
 
-  const cutoff = new Date(today.getTime() - janelaDias * 24 * 60 * 60 * 1000);
+  // Corte de FRESCOR (gate duro pós-seleção). O DIÁRIO é estrito: só ontem + hoje
+  // (cutoff = ontem ⇒ ~32h de manhã, até ~48h à noite) pra o conteúdo ser sempre
+  // recente. Quando faltar volume nesse recorte, o preenchimento-por-área
+  // (relevância "Baixa", coerente com o tema) compensa — em vez de afrouxar a data.
+  // Cadências espaçadas mantêm a folga: faz sentido conteúdo de alguns dias num
+  // email a cada 3 dias / semanal.
+  const cutoffDias = slug === 'daily' ? 1 : janelaDias;
+  const cutoff = new Date(today.getTime() - cutoffDias * 24 * 60 * 60 * 1000);
   const cutoffISO = cutoff.toISOString().split('T')[0];
 
-  let rotulo: string;
-  if (janelaDias === 1) rotulo = 'últimas 24 horas';
-  else rotulo = `últimos ${janelaDias} dias`;
+  // Limite de REABSORÇÃO (degradação graciosa). O cutoff estrito é a preferência;
+  // se não houver itens recentes suficientes, o pipeline reaproveita conteúdo até
+  // este limite mais largo (= base + folga) em vez de mandar um email vazio. Pro
+  // diário, é o "reach-back" pros 2-4 dias anteriores; pras outras cadências é
+  // igual ao cutoffISO (sem reabsorção extra).
+  const cutoffGraceISO = new Date(today.getTime() - janelaDias * 24 * 60 * 60 * 1000)
+    .toISOString()
+    .split('T')[0];
+
+  const rotulo = slug === 'daily' ? 'ontem e hoje (~32h)' : `últimos ${cutoffDias} dias`;
 
   return {
     baseDias,
@@ -152,6 +168,7 @@ export function frequenciaParaJanela(frequencia: string): JanelaFrescor {
     rotulo,
     todayISO,
     cutoffISO,
+    cutoffGraceISO,
     itemsMin,
     itemsMax,
   };

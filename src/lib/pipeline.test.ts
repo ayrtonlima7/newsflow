@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { filterByFreshness, dedupeItems, sortByRecencyDesc, sanitizeCorpo, sortForDisplay, reabsorbFromGrace } from './pipeline';
+import { filterByFreshness, dedupeItems, sortByRecencyDesc, sanitizeCorpo, sortForDisplay, reabsorbFromGrace, normalizeTitleForDedup } from './pipeline';
 import type { BriefingItem } from './types';
 
 function item(titulo: string, data_publicacao: string): BriefingItem {
@@ -109,6 +109,17 @@ describe('sortForDisplay', () => {
   it('sem itens Baixa, é só recência', () => {
     const out = sortForDisplay([it2('a', '2026-06-10', 'Alta'), it2('b', '2026-06-18', 'Média')]);
     expect(out.map((i) => i.titulo)).toEqual(['b', 'a']);
+  });
+});
+
+describe('normalizeTitleForDedup', () => {
+  it('iguala títulos com acento/pontuação/caixa diferentes (base do dedup cross-edição)', () => {
+    expect(normalizeTitleForDedup('Inteligência Artificial: o futuro!'))
+      .toBe(normalizeTitleForDedup('inteligencia artificial o futuro'));
+  });
+  it('mantém títulos diferentes distintos', () => {
+    expect(normalizeTitleForDedup('Flamengo vence'))
+      .not.toBe(normalizeTitleForDedup('Vasco perde'));
   });
 });
 

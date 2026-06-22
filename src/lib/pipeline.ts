@@ -87,7 +87,7 @@ function resolveDomains(profile: Profile, locale: Locale): string[] | undefined 
 }
 
 /** Normaliza título pra detecção de duplicata (minúsculo, sem acento/pontuação). */
-function normalizeTitleForDedup(s: string): string {
+export function normalizeTitleForDedup(s: string): string {
   return s
     .toLowerCase()
     .normalize('NFD')
@@ -125,7 +125,7 @@ export function dedupeItems<T extends { url: string; titulo: string }>(itens: T[
  */
 export async function generateBriefing(
   profile: Profile,
-  opts: { excludeUrls?: Set<string> } = {},
+  opts: { excludeUrls?: Set<string>; excludeTitles?: string[] } = {},
 ): Promise<{ briefing: Briefing; meta: PipelineMeta }> {
   const janela = frequenciaParaJanela(profile.frequencia);
   const locale = normalizeLocale(profile.idioma);
@@ -262,7 +262,7 @@ export async function generateBriefing(
   const provider = await getProvider(
     process.env.CURATE_LLM_PROVIDER ?? process.env.LLM_PROVIDER,
   );
-  const { system, user } = buildCurateFromResultsPrompt(profile, rawResults, locale);
+  const { system, user } = buildCurateFromResultsPrompt(profile, rawResults, locale, opts.excludeTitles ?? []);
   const tCurate = Date.now();
   const result = await provider.complete({
     system,
@@ -321,8 +321,27 @@ export async function generateBriefing(
     console.warn(`[curate] ${dupDropped} item(s) duplicado(s) removido(s) (mesma URL/título no mesmo briefing)`);
   }
 
-  // (A data ground-truth da fonte já foi aplicada na resolução por id acima.
-  // Quando a fonte não tem data, mantém a que o LLM inferiu — não anulamos.)
+  // --- Dedup CROSS-EDIÇÃO por título (plano G, backstop determinístico): o LLM
+  //     já recebe a lista "JÁ ENVIADOS" e deve pular histórias repetidas (inclusive
+  //     reescritas — semântico); aqui pegamos as que escaparam com título ~idêntico
+  //     ao de edições recentes. (A `excludeUrls` cobre URL idêntica; isto cobre a
+  //     mesma história por outra fonte/URL.) ---
+  if (opts.excludeTitles?.length) {
+    const enviados = new Set(opts.excludeTitles.map(normalizeTitleForDedup).filter(Boolean));
+    const antes = briefing.itens.length;
+    briefing.itens = briefing.itens.filter((it) => {
+      const dup = enviados.has(normalizeTitleForDedup(it.titulo));
+      if (dup) console.warn(`[curate] cross-edição: descartado (história já enviada): "${it.titulo}"`);
+      return !dup;
+    });
+    const crossDropped = antes - briefing.itens.length;
+    if (crossDropped > 0) {
+      console.log(`[curate] dedup cross-edição: ${crossDropped} item(s) já enviado(s) removido(s)`);
+    }
+  }
+
+  // (A data ground-truth da fonte já foi aplicada na resolução por id acima:
+  // quando a fonte não tem data, o item fica SEM-DATA — não confiamos na inferida.)
 
   // --- Frescor: corte estrito (preferência) + degradação graciosa ---
   const fresh0 = filterByFreshness(briefing.itens, janela.cutoffISO);

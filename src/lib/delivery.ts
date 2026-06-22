@@ -95,6 +95,7 @@ export async function runDeliveryPipeline(
     const janela = frequenciaParaJanela(input.profile.frequencia);
     const sinceISO = new Date(Date.now() - janela.janelaDias * 86_400_000).toISOString();
     const excludeUrls = new Set<string>();
+    const excludeTitles = new Set<string>(); // plano G: dedup semântico por história
     try {
       const { data: recentes } = await supabase
         .from('briefings')
@@ -104,18 +105,22 @@ export async function runDeliveryPipeline(
         .order('created_at', { ascending: false })
         .limit(10);
       for (const b of recentes ?? []) {
-        for (const it of (b.itens ?? []) as Array<{ url?: string }>) {
+        for (const it of (b.itens ?? []) as Array<{ url?: string; titulo?: string }>) {
           if (it?.url) excludeUrls.add(it.url);
+          if (it?.titulo) excludeTitles.add(it.titulo);
         }
       }
       if (excludeUrls.size > 0) {
-        console.log(`[delivery] dedup: ${excludeUrls.size} URL(s) recentes a evitar (user ${input.userId})`);
+        console.log(`[delivery] dedup: ${excludeUrls.size} URL(s) / ${excludeTitles.size} título(s) recentes a evitar (user ${input.userId})`);
       }
     } catch (e) {
-      console.warn('[delivery] dedup: falha ao buscar URLs recentes, seguindo sem dedup:', e);
+      console.warn('[delivery] dedup: falha ao buscar recentes, seguindo sem dedup:', e);
     }
 
-    const { briefing, meta: curateMeta } = await generateBriefing(input.profile, { excludeUrls });
+    const { briefing, meta: curateMeta } = await generateBriefing(input.profile, {
+      excludeUrls,
+      excludeTitles: [...excludeTitles],
+    });
     costBrl += curateMeta.cost.totalBRL;
 
     const { data: briefingRow, error: bErr } = await supabase

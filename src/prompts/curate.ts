@@ -59,6 +59,7 @@ export function buildCurateFromResultsPrompt(
   profile: Profile,
   results: SearchResult[],
   locale: Locale = 'pt',
+  excludeTitles: string[] = [],
 ): { system: string; user: string } {
   const janela = frequenciaParaJanela(profile.frequencia);
   const p = profileForPrompt(profile, locale);
@@ -80,6 +81,13 @@ export function buildCurateFromResultsPrompt(
     })
     .join('\n\n');
 
+  // Dedup semântico entre edições (plano G): histórias já enviadas recentemente
+  // pro LLM PULAR — mesmo reescritas / de outra fonte. Cap pra não inflar o prompt.
+  const recentes = excludeTitles.filter((t) => t && t.trim()).slice(0, 30);
+  const jaEnviadosBloco = recentes.length
+    ? `\nJÁ ENVIADOS RECENTEMENTE (NÃO repita estas histórias — nem reescritas, nem de outra fonte/veículo; o leitor quer NOVIDADE):\n${recentes.map((t) => `- ${t}`).join('\n')}\n`
+    : '';
+
   const user = `PERFIL DO USUÁRIO:
 ${JSON.stringify(p, null, 2)}
 
@@ -90,12 +98,13 @@ JANELA DE FRESCOR: ${janela.rotulo} — NÃO inclua NADA publicado antes de ${ja
 
 RESULTADOS DE BUSCA DISPONÍVEIS (${results.length} itens):
 ${resultsList}
-
+${jaEnviadosBloco}
 INSTRUÇÕES:
 - ⚠️ IDIOMA DE SAÍDA: escreva TODO o conteúdo visível (assunto, intro, titulo, corpo) em ${LANGUAGE_NAME[locale]}. Os resultados de busca podem estar em qualquer idioma — traduza/reescreva o que for usar para ${LANGUAGE_NAME[locale]}. NÃO misture idiomas.
 - SELECIONE entre ${janela.itemsMin} e ${janela.itemsMax} resultados — os mais relevantes pro perfil e mais frescos.
 - ⏱️ RECÊNCIA: entre itens igualmente relevantes, SEMPRE prefira o mais recente. Notícia de hoje/ontem ganha de notícia de 3 dias atrás. Só inclua algo com 2+ dias se não houver opção mais fresca e relevante.
 - Use "objetivo" e "contexto" pra calibrar recorte e profundidade. Priorize "topicos" e "referencias". IGNORE o que cai em "ignorar".
+- 🔁 NÃO REPITA o que já foi enviado: se há a lista "JÁ ENVIADOS RECENTEMENTE", pule qualquer história que o usuário já recebeu — MESMO que aqui apareça de outra fonte, com outro título ou ângulo levemente diferente. Mesma história = não repete. Prefira conteúdo novo.
 - ⚠️ RELEVÂNCIA É OBRIGATÓRIA: só inclua itens REALMENTE sobre os "tema"/"topicos" do usuário. NUNCA inclua uma notícia que você mesmo descreveria como "não tem relação" / "fora do escopo" (ex: outro esporte, outra liga, política ou país aleatórios) só pra preencher a contagem. É MUITO MELHOR retornar MENOS itens — ou nenhum ("itens": []) — do que encher com conteúdo irrelevante. Não comente itens que você descartou; simplesmente não os inclua.
 - ⚠️ CUIDADO COM MEGA-EVENTOS: assuntos de altíssimo volume (Copa do Mundo, eleição, grande premiação) dominam os resultados de busca e tentam vazar pra QUALQUER perfil. Só inclua um item de mega-evento se ele casar DIRETO com um "tema"/"topico" do usuário. NÃO force a barra ("o usuário curte X, e o mega-evento toca X de leve") — se o tema dele é de nicho e não há notícia fresca dele, NÃO encha com o assunto do momento.
 - 📊 PREENCHIMENTO POR ÁREA (quando faltar item dos "topicos"): primeiro escolha os itens diretamente sobre os "topicos" (são os principais). Se NÃO houver itens frescos suficientes nos "topicos" pra chegar ao mínimo, você PODE completar com itens que sejam da MESMA ÁREA AMPLA do usuário — ou seja, dos "tema" dele (ex: se o tema é "Tecnologia", uma notícia tech relevante serve mesmo não sendo do tópico exato). Esses itens de preenchimento: (a) têm que ser coerentes com a área declarada do usuário — NUNCA algo fora dela (outro esporte, assunto aleatório, mega-evento que não casa); (b) marque com "relevancia": "Baixa"; (c) serão exibidos por último. Ainda assim: melhor 1 item a menos que 1 item incoerente.

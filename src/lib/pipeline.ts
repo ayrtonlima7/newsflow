@@ -302,7 +302,10 @@ export async function generateBriefing(
     }
     item.url = src.url;
     if (src.sourceName) item.fonte = src.sourceName; // fonte real (ex: <source> do RSS)
-    if (src.publishedDate) item.data_publicacao = src.publishedDate; // data ground-truth
+    // Data = SEMPRE a da fonte (ground truth). Se a fonte não tem data, NÃO
+    // confiamos na que o LLM inferiu (ele datava matéria velha como recente) —
+    // vira sem-data e o frescor decide. Mata o "evergreen datado de hoje".
+    item.data_publicacao = src.publishedDate ?? '';
     delete (item as { id?: number }).id;
     return true;
   });
@@ -341,22 +344,26 @@ export async function generateBriefing(
     }
   }
 
-  // Itens datados-frescos são preferidos; os sem data entram só como PREENCHIMENTO
-  // até atingir itemsMin (evita ensaio atemporal dominar a edição, mas mantém
-  // recall em dia fraco). Em dia cheio (datados >= itemsMin), os sem data caem.
-  //
   // Ordem de exibição: principais por recência, preenchimento-por-área (relevância
   // "Baixa") por último. Sem isso o frescor era keep/drop binário e um item antigo
-  // com score alto aparecia acima de uma notícia de hoje. Os sem-data ficam no fim.
+  // com score alto aparecia acima de uma notícia de hoje.
   const freshItems = sortForDisplay(datedFresh);
+
+  // PREENCHIMENTO sem-data: item sem data tem IDADE DESCONHECIDA — pode ser uma
+  // matéria velha/evergreen (foi a causa do "email com conteúdo antigo": em dia
+  // seco o estrito zerava os datados e o filler despejava evergreen recauchutado).
+  // No DIÁRIO ESTRITO ("sempre recente") NÃO usamos sem-data: melhor poucos itens
+  // datados-de-verdade que encher com idade desconhecida. Cadências espaçadas
+  // (folga == cutoff) ainda permitem como último recurso.
+  const permiteUndated = janela.cutoffGraceISO >= janela.cutoffISO; // false p/ diário estrito
   let undatedKept = 0;
-  if (freshItems.length < janela.itemsMin && undated.length > 0) {
+  if (permiteUndated && freshItems.length < janela.itemsMin && undated.length > 0) {
     undatedKept = Math.min(janela.itemsMin - freshItems.length, undated.length);
     freshItems.push(...undated.slice(0, undatedKept));
   }
   const undatedDropped = undated.length - undatedKept;
   if (undatedDropped > 0) {
-    console.warn(`[curate] ${undatedDropped} item(s) sem data descartado(s) (já havia ${datedFresh.length} datados, itemsMin=${janela.itemsMin})`);
+    console.warn(`[curate] ${undatedDropped} item(s) sem data descartado(s) (${permiteUndated ? `já havia ${datedFresh.length} datados` : 'diário estrito não usa sem-data'}, itemsMin=${janela.itemsMin})`);
   }
 
   // --- Validação LENIENTE só dos selecionados (~7, não 32) ---

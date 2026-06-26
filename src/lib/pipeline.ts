@@ -368,21 +368,22 @@ export async function generateBriefing(
   // com score alto aparecia acima de uma notícia de hoje.
   const freshItems = sortForDisplay(datedFresh);
 
-  // PREENCHIMENTO sem-data: item sem data tem IDADE DESCONHECIDA — pode ser uma
-  // matéria velha/evergreen (foi a causa do "email com conteúdo antigo": em dia
-  // seco o estrito zerava os datados e o filler despejava evergreen recauchutado).
-  // No DIÁRIO ESTRITO ("sempre recente") NÃO usamos sem-data: melhor poucos itens
-  // datados-de-verdade que encher com idade desconhecida. Cadências espaçadas
-  // (folga == cutoff) ainda permitem como último recurso.
-  const permiteUndated = janela.cutoffGraceISO >= janela.cutoffISO; // false p/ diário estrito
+  // PREENCHIMENTO sem-data, COM TETO. "Sem data" quase sempre é só o Tavily não
+  // ter devolvido a data (quirk — não data nem matéria de hoje), então INCLUI
+  // itens frescos: derrubar tudo deixava perfis estreitos com email VAZIO. Então
+  // usamos como filler em toda cadência (não ficar vazio), mas CAPADO em ~metade
+  // do mínimo pra a edição não virar 100% idade-desconhecida. Vão por último
+  // (após os datados). O repetido-velho — a queixa real — é barrado pelo dedup
+  // cross-edição (plano G), não por cortar sem-data.
+  const undatedCap = Math.ceil(janela.itemsMin / 2);
   let undatedKept = 0;
-  if (permiteUndated && freshItems.length < janela.itemsMin && undated.length > 0) {
-    undatedKept = Math.min(janela.itemsMin - freshItems.length, undated.length);
+  if (freshItems.length < janela.itemsMin && undated.length > 0) {
+    undatedKept = Math.min(janela.itemsMin - freshItems.length, undated.length, undatedCap);
     freshItems.push(...undated.slice(0, undatedKept));
   }
   const undatedDropped = undated.length - undatedKept;
   if (undatedDropped > 0) {
-    console.warn(`[curate] ${undatedDropped} item(s) sem data descartado(s) (${permiteUndated ? `já havia ${datedFresh.length} datados` : 'diário estrito não usa sem-data'}, itemsMin=${janela.itemsMin})`);
+    console.warn(`[curate] ${undatedDropped} item(s) sem data descartado(s) (mantidos ${undatedKept}, teto ${undatedCap}, datados=${datedFresh.length}, itemsMin=${janela.itemsMin})`);
   }
 
   // --- Validação LENIENTE só dos selecionados (~7, não 32) ---

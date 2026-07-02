@@ -120,7 +120,7 @@ On profile save (onboarding + settings), `deriveDomains(profile)` calls **DeepSe
 - **Idempotency by calendar period** (`alreadyDeliveredThisPeriod`): daily → already delivered same SP calendar day; 3-day → within 2.5 days; weekly → within 6 days. This is by PERIOD, not "X hours since last" — so a manual test yesterday doesn't block today's scheduled send.
 
 ⚠️ Known limits:
-- cron-job.org free tier has a **30s request timeout**. The pipeline now runs ~22s (after the curate+email merge), under the limit. If it creeps back up, cron-job.org marks "timeout" but the Vercel function still completes (email sends) — idempotency prevents a duplicate on retry.
+- cron-job.org free tier has a **30s request timeout**, and one curation takes ~30-40s — so a synchronous run made cron-job.org report "timeout/failure" even though the email sent. **Fixed:** the scheduled call (no `dry`/`force`/`user_id` flags) now returns **202 immediately** and runs the deliveries in the background via Next 15's **`after()`** (`processDeliveries()` helper) — cron-job.org gets a fast 200, no false-failure, no retry-driven duplicate. The background work is still bounded by `maxDuration` (180) / the Vercel plan cap; users not reached before the cap are picked up on the next 30-min tick (idempotency prevents dupes). **Manual/debug calls (`dry=1`/`force=1`/`user_id=`) stay SYNCHRONOUS** and return the detailed `results` array.
 - Vercel Hobby caps functions at 60s. At ~22s/user **sequential**, 2 users at the same hour ≈ 44s (ok), 3+ risks timeout. Fix for scale: per-user invocation (fan-out) or a queue (Upstash QStash).
 
 ### Auth & RLS

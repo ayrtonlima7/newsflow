@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse, after } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { runDeliveryPipeline } from '@/src/lib/delivery';
 import type { Profile } from '@/src/lib/types';
@@ -106,49 +106,28 @@ function isDue(
   return { due: true };
 }
 
-export async function GET(req: NextRequest) {
-  const cronSecret = process.env.CRON_SECRET;
-  if (!cronSecret) {
-    return NextResponse.json(
-      { error: 'CRON_SECRET não configurado' },
-      { status: 500 },
-    );
-  }
+type DeliveryResultSummary = {
+  user_id: string;
+  status: string;
+  reason?: string;
+  delivery_id?: string | null;
+  items?: number;
+  cost_brl?: number;
+  error?: string;
+};
 
-  const auth = req.headers.get('authorization');
-  if (auth !== `Bearer ${cronSecret}`) {
-    return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
-  }
+/** Processa (isDue → pipeline) cada perfil. Usado tanto no modo síncrono (debug)
+ *  quanto no background (after) do cron agendado. */
+async function processDeliveries(
+  supabase: ReturnType<typeof createAdminClient>,
+  profiles: ProfileRow[],
+  now: Date,
+  opts: { dryRun: boolean; ignoreSchedule: boolean },
+): Promise<DeliveryResultSummary[]> {
+  const results: DeliveryResultSummary[] = [];
 
-  const dryRun = req.nextUrl.searchParams.get('dry') === '1';
-  const forceUserId = req.nextUrl.searchParams.get('user_id');
-  const ignoreSchedule = req.nextUrl.searchParams.get('force') === '1';
-
-  const supabase = createAdminClient();
-  const now = new Date();
-
-  let query = supabase.from('profiles').select('*').eq('is_active', true);
-  if (forceUserId) query = query.eq('user_id', forceUserId);
-
-  const { data: profiles, error: pErr } = await query;
-  if (pErr) {
-    return NextResponse.json({ error: pErr.message }, { status: 500 });
-  }
-
-  const results: Array<{
-    user_id: string;
-    status: string;
-    reason?: string;
-    delivery_id?: string | null;
-    items?: number;
-    cost_brl?: number;
-    error?: string;
-  }> = [];
-
-  for (const row of profiles ?? []) {
-    const profile = row as ProfileRow;
-
-    if (!ignoreSchedule) {
+  for (const profile of profiles) {
+    if (!opts.ignoreSchedule) {
       const due = isDue(profile, now);
       if (!due.due) {
         results.push({ user_id: profile.user_id, status: 'skipped', reason: due.reason });
@@ -191,7 +170,7 @@ export async function GET(req: NextRequest) {
         },
       },
       // force=1 também pula o gate de assinatura (pra admin testar)
-      { dryRun, skipGate: ignoreSchedule },
+      { dryRun: opts.dryRun, skipGate: opts.ignoreSchedule },
     );
 
     results.push({
@@ -204,6 +183,78 @@ export async function GET(req: NextRequest) {
     });
   }
 
+  return results;
+}
+
+export async function GET(req: NextRequest) {
+  const cronSecret = process.env.CRON_SECRET;
+  if (!cronSecret) {
+    return NextResponse.json(
+      { error: 'CRON_SECRET não configurado' },
+      { status: 500 },
+    );
+  }
+
+  const auth = req.headers.get('authorization');
+  if (auth !== `Bearer ${cronSecret}`) {
+    return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+  }
+
+  const dryRun = req.nextUrl.searchParams.get('dry') === '1';
+  const forceUserId = req.nextUrl.searchParams.get('user_id');
+  const ignoreSchedule = req.nextUrl.searchParams.get('force') === '1';
+
+  const supabase = createAdminClient();
+  const now = new Date();
+
+  let query = supabase.from('profiles').select('*').eq('is_active', true);
+  if (forceUserId) query = query.eq('user_id', forceUserId);
+
+  const { data: profiles, error: pErr } = await query;
+  if (pErr) {
+    return NextResponse.json({ error: pErr.message }, { status: 500 });
+  }
+
+  const dueProfiles = (profiles ?? []) as ProfileRow[];
+  const isManual = dryRun || ignoreSchedule || !!forceUserId;
+
+  // Cron AGENDADO (sem flags): responde JÁ (202) e processa em BACKGROUND (after).
+  // O cron-job.org tem timeout de 30s e cada curadoria leva ~30-40s — processar
+  // síncrono fazia ele marcar "falha" mesmo com o email saindo (a função Vercel
+  // segue até maxDuration). Responder rápido mata o falso-negativo e evita
+  // retry/duplicata. Testes manuais (dry/force/user_id) seguem SÍNCRONOS pra
+  // mostrar os resultados detalhados.
+  if (!isManual) {
+    after(async () => {
+      try {
+        const results = await processDeliveries(supabase, dueProfiles, now, {
+          dryRun,
+          ignoreSchedule,
+        });
+        const sent = results.filter((r) => r.status === 'sent').length;
+        const skipped = results.filter((r) => r.status.startsWith('skipped')).length;
+        const failed = results.filter((r) => r.status === 'failed').length;
+        console.log(
+          `[cron] background done | processed=${results.length} sent=${sent} skipped=${skipped} failed=${failed}`,
+        );
+      } catch (e) {
+        console.error('[cron] background error:', e);
+      }
+    });
+    return NextResponse.json(
+      {
+        status: 'accepted',
+        timestamp: now.toISOString(),
+        sp_hour: spHourNow(now),
+        candidates: dueProfiles.length,
+        note: 'processando em background (after) — resultados nos logs',
+      },
+      { status: 202 },
+    );
+  }
+
+  // Manual/debug → síncrono, retorna os resultados detalhados.
+  const results = await processDeliveries(supabase, dueProfiles, now, { dryRun, ignoreSchedule });
   return NextResponse.json({
     timestamp: now.toISOString(),
     sp_hour: spHourNow(now),

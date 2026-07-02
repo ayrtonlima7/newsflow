@@ -88,12 +88,13 @@ export async function runDeliveryPipeline(
       }
     }
 
-    // --- Dedup entre entregas: junta as URLs que o usuário já recebeu nas edições
-    //     dentro da janela de frescor (URLs mais antigas que isso não reapareceriam
-    //     de qualquer forma, o frescor as cortaria). Falha-segura: erro aqui só
+    // --- Dedup entre entregas. Janela FIXA de 21 dias (não a de frescor): itens
+    //     SEM-DATA (evergreen) não são cortados pelo frescor, então reapareciam
+    //     assim que saíam da janela curta (medido: matéria voltando 5 dias depois).
+    //     21 dias barra o evergreen por muito mais tempo. Falha-segura: erro aqui só
     //     desliga o dedup, não derruba a entrega. ---
-    const janela = frequenciaParaJanela(input.profile.frequencia);
-    const sinceISO = new Date(Date.now() - janela.janelaDias * 86_400_000).toISOString();
+    const DEDUP_WINDOW_DAYS = 21;
+    const sinceISO = new Date(Date.now() - DEDUP_WINDOW_DAYS * 86_400_000).toISOString();
     const excludeUrls = new Set<string>();
     const excludeTitles = new Set<string>(); // plano G: dedup semântico por história
     try {
@@ -103,7 +104,7 @@ export async function runDeliveryPipeline(
         .eq('user_id', input.userId)
         .gte('created_at', sinceISO)
         .order('created_at', { ascending: false })
-        .limit(10);
+        .limit(40);
       for (const b of recentes ?? []) {
         for (const it of (b.itens ?? []) as Array<{ url?: string; titulo?: string }>) {
           if (it?.url) excludeUrls.add(it.url);

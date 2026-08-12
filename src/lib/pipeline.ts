@@ -4,6 +4,7 @@ import { calculateCost } from './pricing';
 import { validateSelectedLeniently, type DroppedItem } from './url-validation';
 import { tavilySearchMany, tavilyExtract, type SearchResult } from './search';
 import { googleNewsSearchMany } from './search-rss';
+import { serperSearchMany } from './search-serper';
 import { renderEmailHtml } from './email-template';
 import type { Profile, Briefing, BriefingItem, EmailOutput } from './types';
 import { frequenciaParaJanela } from './types';
@@ -132,13 +133,19 @@ export async function generateBriefing(
   const t0 = Date.now();
   const since = () => `${((Date.now() - t0) / 1000).toFixed(1)}s`;
 
-  // --- Passo 1: busca real. SEARCH_PROVIDER: 'tavily' (só Tavily, kill-switch) |
-  //     'rss' (só Google News RSS) | ausente/'merge' = FAN-OUT (default): roda as
-  //     duas fontes e mescla. Tavily traz corpo extraível (tópico amplo); o RSS
-  //     cobre nicho/local DATADO que o Tavily não pega e engrossa o pool — de
-  //     graça (sem chave). Mais candidatos ⇒ diário enche melhor + frescor real. ---
+  // --- Passo 1: busca real. SEARCH_PROVIDER: 'tavily' (kill-switch — busca só
+  //     Tavily, pro caso do Serper cair) | 'rss' (só Google News RSS) | 'serper'
+  //     (só Serper) | ausente/'merge' = FAN-OUT (default): Serper (principal,
+  //     datado) + RSS (cobertura de nicho/local), com Tavily como rede de
+  //     segurança se os dois vierem MUITO pouco. Trocado de Tavily→Serper como
+  //     fonte principal em 12/ago/2026: medido que o Tavily passou a devolver
+  //     0% de data nas queries reais (era ~74% no deploy de jul), enquanto o
+  //     Serper devolve ~100% — e a URL real do Serper (não é redirect como o
+  //     RSS) destrava o /extract do Tavily pra corpo denso em qualquer fonte. ---
   const searchProvider =
-    process.env.SEARCH_PROVIDER === 'tavily' || process.env.SEARCH_PROVIDER === 'rss'
+    process.env.SEARCH_PROVIDER === 'tavily' ||
+    process.env.SEARCH_PROVIDER === 'rss' ||
+    process.env.SEARCH_PROVIDER === 'serper'
       ? process.env.SEARCH_PROVIDER
       : 'merge';
   const queries = buildSearchQueries(profile, locale);
@@ -169,9 +176,10 @@ export async function generateBriefing(
   };
   const searchRss = (): Promise<SearchResult[]> =>
     googleNewsSearchMany(queries, { days: janela.janelaDias, maxResults: 10 }, locale);
+  const searchSerper = (): Promise<SearchResult[]> =>
+    serperSearchMany(queries, { days: janela.janelaDias, maxResults: 10 }, locale);
 
-  // Teto do pool mesclado pra não estourar o prompt do LLM (Tavily score-desc
-  // primeiro, RSS data-desc depois → o extract pega os top Tavily; o resto é oferta).
+  // Teto do pool mesclado pra não estourar o prompt do LLM.
   const MERGE_CAP = 50;
   const tSearch = Date.now();
   let rawResults: SearchResult[];
@@ -185,12 +193,28 @@ export async function generateBriefing(
     console.log(
       `[timing] Google News RSS (${queries.length} queries): ${((Date.now() - tSearch) / 1000).toFixed(1)}s → ${rawResults.length} | total ${since()}`,
     );
-  } else {
-    const [tav, rss] = await Promise.all([searchTavily(), searchRss()]);
-    const seen = new Set(tav.map((r) => r.url));
-    rawResults = [...tav, ...rss.filter((r) => !seen.has(r.url))].slice(0, MERGE_CAP);
+  } else if (searchProvider === 'serper') {
+    rawResults = await searchSerper();
     console.log(
-      `[timing] fan-out Tavily(${tav.length})+RSS(${rss.length})→${rawResults.length}/cap${MERGE_CAP}: ${((Date.now() - tSearch) / 1000).toFixed(1)}s | total ${since()}`,
+      `[timing] Serper (${queries.length} queries): ${((Date.now() - tSearch) / 1000).toFixed(1)}s → ${rawResults.length} | total ${since()}`,
+    );
+  } else {
+    const [ser, rss] = await Promise.all([searchSerper(), searchRss()]);
+    const seen = new Set(ser.map((r) => r.url));
+    rawResults = [...ser, ...rss.filter((r) => !seen.has(r.url))];
+    // Rede de segurança: Serper+RSS vieram MUITO pouco (ex: chave sem saldo,
+    // instabilidade momentânea) → complementa com Tavily antes de devolver vazio.
+    if (rawResults.length < janela.itemsMin) {
+      console.warn(
+        `[curate] Serper+RSS devolveram ${rawResults.length} (< itemsMin ${janela.itemsMin}) — complementando com Tavily (rede de segurança)`,
+      );
+      const tav = await searchTavily();
+      const seen2 = new Set(rawResults.map((r) => r.url));
+      rawResults = [...rawResults, ...tav.filter((r) => !seen2.has(r.url))];
+    }
+    rawResults = rawResults.slice(0, MERGE_CAP);
+    console.log(
+      `[timing] fan-out Serper(${ser.length})+RSS(${rss.length})→${rawResults.length}/cap${MERGE_CAP}: ${((Date.now() - tSearch) / 1000).toFixed(1)}s | total ${since()}`,
     );
   }
 
@@ -224,13 +248,13 @@ export async function generateBriefing(
   }
 
   // --- Passo 1.5: enriquecer com texto completo (raw_content) pra corpo denso.
-  //     A busca news+domínios (perfis pt) NÃO retorna raw_content (quirk do
-  //     Tavily), só snippet — então extraímos sob demanda os TOP candidatos por
-  //     score (rawResults já vem ordenado por score desc) que vieram SEM texto.
-  //     en/es e o fallback global já trazem raw_content de graça na busca, então
-  //     não pagamos /extract por eles. Limita a itemsMax+5 pra bound de custo
-  //     (~0,2 crédito/URL): o LLM seleciona dos mais bem ranqueados de qualquer
-  //     forma. Fail-soft: sem texto, o corpo cai pro snippet. ---
+  //     Nem Serper nem Tavily(quando usado) devolvem o texto completo na busca —
+  //     só snippet — então extraímos sob demanda os TOP candidatos (rawResults já
+  //     vem ordenado por score desc) que vieram SEM texto. Confirmado (12/ago):
+  //     URLs do Serper são reais (não redirect) → o /extract do Tavily funciona
+  //     nelas normalmente. Limita a itemsMax+5 pra bound de custo (~0,2
+  //     crédito/URL): o LLM seleciona dos mais bem ranqueados de qualquer forma.
+  //     Fail-soft: sem texto, o corpo cai pro snippet. ---
   // Extração só nos itens com URL REAL e sem texto ainda. Links-redirect do Google
   // News (RSS) o /extract do Tavily não resolve — ficam de fora (corpo no snippet;
   // Tier 1.5 resolverá o redirect). No modo 'rss' puro, pula tudo.

@@ -7,6 +7,8 @@ import { I18nProvider } from './_i18n/provider';
 import { LanguageSwitcher } from './_i18n/language-switcher';
 import { AnalyticsProvider } from './_analytics/analytics-provider';
 import { ThemeToggle } from './_brand/theme-toggle';
+import { SignOutButton } from './_brand/sign-out-button';
+import { createClient } from '@/lib/supabase/server';
 
 // Script anti-flash (FOUC): roda ANTES do paint, lê o tema salvo e aplica no
 // <html>. Default LIGHT — só vira dark se o usuário escolheu (localStorage).
@@ -23,6 +25,19 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const locale = await getLocale();
   const dict = getDictionary(locale);
 
+  // Só mostra "Sair" se há sessão. Fail-soft: erro aqui (ex: Supabase fora) não
+  // derruba o layout — apenas esconde o botão.
+  let isAuthed = false;
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    isAuthed = !!user;
+  } catch {
+    isAuthed = false;
+  }
+
   return (
     <html lang={HTML_LANG[locale]} suppressHydrationWarning>
       <head>
@@ -31,10 +46,13 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       <body>
         <AnalyticsProvider />
         <I18nProvider locale={locale} dict={dict}>
-          {/* Controles globais (tema + idioma) — presentes em toda página. */}
+          {/* Controles globais (tema + idioma + sair) — presentes em toda página.
+              O "Sair" só aparece logado, e é o que garante saída de QUALQUER
+              página autenticada (inclusive /onboarding, que antes prendia). */}
           <div className="fixed right-3 top-3 z-50 flex items-center gap-2">
             <ThemeToggle />
             <LanguageSwitcher />
+            {isAuthed && <SignOutButton />}
           </div>
           {children}
         </I18nProvider>

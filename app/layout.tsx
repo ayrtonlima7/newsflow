@@ -8,7 +8,7 @@ import { LanguageSwitcher } from './_i18n/language-switcher';
 import { AnalyticsProvider } from './_analytics/analytics-provider';
 import { ThemeToggle } from './_brand/theme-toggle';
 import { SignOutButton } from './_brand/sign-out-button';
-import { createClient } from '@/lib/supabase/server';
+import { cookies } from 'next/headers';
 
 // Script anti-flash (FOUC): roda ANTES do paint, lê o tema salvo e aplica no
 // <html>. Default LIGHT — só vira dark se o usuário escolheu (localStorage).
@@ -25,18 +25,16 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const locale = await getLocale();
   const dict = getDictionary(locale);
 
-  // Só mostra "Sair" se há sessão. Fail-soft: erro aqui (ex: Supabase fora) não
-  // derruba o layout — apenas esconde o botão.
-  let isAuthed = false;
-  try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    isAuthed = !!user;
-  } catch {
-    isAuthed = false;
-  }
+  // Só mostra "Sair" quando há cookie de sessão. Checagem LOCAL de cookie, de
+  // propósito: `auth.getUser()` faria uma chamada de REDE ao Supabase em TODA
+  // página (o layout raiz envolve tudo, inclusive a landing e as páginas
+  // públicas /n/...), somando latência e um ponto de falha global — caro demais
+  // pra decidir a exibição de um botão. Não é fronteira de segurança: toda
+  // autorização de verdade (middleware, /settings, /onboarding, server actions)
+  // continua usando getUser(). Pior caso de um cookie vencido é mostrar "Sair"
+  // pra quem já expirou — e clicar apenas limpa a sessão e volta pra home.
+  const cookieStore = await cookies();
+  const isAuthed = cookieStore.getAll().some((c) => c.name.includes('-auth-token'));
 
   return (
     <html lang={HTML_LANG[locale]} suppressHydrationWarning>

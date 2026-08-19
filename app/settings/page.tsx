@@ -1,7 +1,6 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
-import { signOut } from '@/app/login/actions';
 import { SettingsForm } from './settings-form';
 import { SampleCard } from './sample-card';
 import { SubscriptionCard } from './subscription-card';
@@ -37,6 +36,19 @@ export default async function SettingsPage({
     .maybeSingle();
 
   if (!profile) redirect('/onboarding');
+
+  // "Antecipar curadoria" é one-shot: só vale pra PRIMEIRA edição, enquanto o
+  // usuário nunca recebeu nada. Depois da primeira (por este botão OU pelo cron),
+  // o card desaparece — a partir daí a cadência normal manda. Contamos deliveries
+  // 'sent' porque é o sinal inequívoco de "já recebeu" (last_delivered_at e
+  // sample_cooldown_until servem a outros propósitos: idempotência do cron e
+  // cooldown, respectivamente).
+  const { count: sentCount } = await supabase
+    .from('deliveries')
+    .select('*', { count: 'exact', head: true })
+    .eq('user_id', user.id)
+    .eq('status', 'sent');
+  const neverDelivered = (sentCount ?? 0) === 0;
 
   const isAdmin = !!process.env.ADMIN_EMAIL && user.email === process.env.ADMIN_EMAIL;
 
@@ -80,14 +92,8 @@ export default async function SettingsPage({
               {t('settings.admin')}
             </Link>
           )}
-          <form action={signOut}>
-            <button
-              type="submit"
-              className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-2 text-sm hover:border-[var(--color-fg)]"
-            >
-              {t('settings.signOut')}
-            </button>
-          </form>
+          {/* "Sair" agora vive no chrome global (app/layout.tsx) — disponível em
+              toda página autenticada, não só aqui. */}
         </div>
       </div>
 
@@ -111,13 +117,11 @@ export default async function SettingsPage({
         deliveryEmail={profile.delivery_email ?? null}
       />
 
-      {/* Amostra só pra quem está liberado (assinante/trial). Free vê o card de
-          assinatura acima — o "test drive" do produto é o trial de 30 dias. */}
-      {gate.allowed && (
-        <SampleCard
-          userEmail={profile.delivery_email || user.email || ''}
-          sampleCooldownUntil={profile.sample_cooldown_until ?? null}
-        />
+      {/* Amostra só pra quem está liberado (assinante/trial) E ainda não recebeu
+          nenhuma edição — é o "antecipar a primeira curadoria". Free vê o card de
+          assinatura acima; quem já recebeu segue só na cadência do perfil. */}
+      {gate.allowed && neverDelivered && (
+        <SampleCard userEmail={profile.delivery_email || user.email || ''} />
       )}
 
       <SettingsForm initial={initial} isActive={profile.is_active} />

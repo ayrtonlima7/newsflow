@@ -1,38 +1,27 @@
 'use client';
 
-import { useEffect, useState, useTransition } from 'react';
+import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { sendSampleNow, type SampleResult } from './actions';
-import { formatCooldown } from './constants';
 import { useT } from '../_i18n/provider';
 
 interface Props {
   userEmail: string;
-  /** Quando o próximo "Gerar agora" fica disponível (ISO). Segue a frequência
-   *  do perfil; null = sem cooldown. */
-  sampleCooldownUntil: string | null;
 }
 
 const IS_DEV = process.env.NODE_ENV === 'development';
 
-export function SampleCard({ userEmail, sampleCooldownUntil }: Props) {
+/**
+ * Card "antecipar a primeira curadoria". É ONE-SHOT: quem renderiza (settings/page)
+ * só monta este card enquanto o usuário nunca recebeu nenhuma edição. Depois da
+ * primeira entrega (por aqui ou pelo cron) o card não aparece mais — por isso aqui
+ * não há mais lógica de cooldown/contagem regressiva.
+ */
+export function SampleCard({ userEmail }: Props) {
   const router = useRouter();
   const t = useT();
   const [pending, startTransition] = useTransition();
   const [result, setResult] = useState<SampleResult | null>(null);
-  const [now, setNow] = useState<number>(() => Date.now());
-
-  const untilMs = sampleCooldownUntil ? new Date(sampleCooldownUntil).getTime() : 0;
-  const cooldownRemaining = untilMs ? Math.max(0, untilMs - now) : 0;
-  // Em DEV (local) o cooldown não bloqueia o botão — facilita testar gerações
-  // seguidas. Em produção, o cooldown por frequência vale normalmente.
-  const onCooldown = !IS_DEV && cooldownRemaining > 0;
-
-  useEffect(() => {
-    if (!onCooldown) return;
-    const id = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(id);
-  }, [onCooldown]);
 
   function handleClick() {
     setResult(null);
@@ -45,11 +34,7 @@ export function SampleCard({ userEmail, sampleCooldownUntil }: Props) {
     });
   }
 
-  const buttonLabel = pending
-    ? t('sample.generating')
-    : onCooldown
-      ? t('sample.wait', { time: formatCooldown(cooldownRemaining) })
-      : t('sample.send');
+  const buttonLabel = pending ? t('sample.generating') : t('sample.send');
 
   return (
     <div className="space-y-4">
@@ -65,7 +50,7 @@ export function SampleCard({ userEmail, sampleCooldownUntil }: Props) {
           <button
             type="button"
             onClick={handleClick}
-            disabled={pending || onCooldown}
+            disabled={pending}
             className="shrink-0 rounded-md bg-[var(--color-accent)] px-4 py-2 text-sm text-[var(--color-accent-fg)] transition hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {buttonLabel}
@@ -85,7 +70,7 @@ export function SampleCard({ userEmail, sampleCooldownUntil }: Props) {
 
         {result && !result.ok && (
           <div className="mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-            {result.error}
+            {result.alreadyDelivered ? t('sample.alreadyDelivered') : result.error}
           </div>
         )}
       </div>

@@ -9,7 +9,6 @@ import { normalizeTopics } from '@/src/lib/topic-normalization';
 import { deriveDomains } from '@/src/lib/domain-derivation';
 import { runDeliveryPipeline } from '@/src/lib/delivery';
 import type { Profile } from '@/src/lib/types';
-import { formatCooldown } from './constants';
 
 const DELIVERY_CODE_TTL_MIN = 15;
 const DELIVERY_CODE_MAX_ATTEMPTS = 5;
@@ -62,28 +61,9 @@ export async function updateProfile(
     return { ok: false, error: 'escolha um horário' };
   }
 
-  const [topicos_busca, dominios_busca] = await Promise.all([
-    normalizeTopics(input.topicos, {
-      tema: input.tema,
-      contexto: input.contexto.join(', '),
-      descricao_livre: input.descricao_livre,
-      objetivo: input.objetivo.join(', '),
-    }),
-    deriveDomains({
-      nome: input.nome,
-      tema: input.tema,
-      contexto: input.contexto,
-      descricao_livre: input.descricao_livre,
-      objetivo: input.objetivo,
-      topicos: input.topicos,
-      referencias: input.referencias,
-      formatos: input.formatos,
-      ignorar: input.ignorar,
-      frequencia: input.frequencia,
-      horario: input.horario,
-    }),
-  ]);
-
+  // Salva as preferências PRIMEIRO (durável), deriva depois — mesma razão do
+  // onboarding: as 2 chamadas de LLM podem estourar o timeout e, se rodassem
+  // antes do update, a edição do usuário seria perdida.
   const { error } = await supabase
     .from('profiles')
     .update({
@@ -93,8 +73,6 @@ export async function updateProfile(
       descricao_livre: input.descricao_livre ?? '',
       objetivo: input.objetivo,
       topicos: input.topicos,
-      topicos_busca,
-      dominios_busca,
       referencias: input.referencias ?? [],
       formatos: input.formatos,
       ignorar: input.ignorar ?? [],
@@ -108,6 +86,41 @@ export async function updateProfile(
     return { ok: false, error: error.message };
   }
 
+  // Deriva os campos de busca depois (best-effort). Falha aqui não desfaz a
+  // edição já salva; `npm run rederive-domains` cobre o backfill.
+  try {
+    const [topicos_busca, dominios_busca] = await Promise.all([
+      normalizeTopics(input.topicos, {
+        tema: input.tema,
+        contexto: input.contexto.join(', '),
+        descricao_livre: input.descricao_livre,
+        objetivo: input.objetivo.join(', '),
+      }),
+      deriveDomains({
+        nome: input.nome,
+        tema: input.tema,
+        contexto: input.contexto,
+        descricao_livre: input.descricao_livre,
+        objetivo: input.objetivo,
+        topicos: input.topicos,
+        referencias: input.referencias,
+        formatos: input.formatos,
+        ignorar: input.ignorar,
+        frequencia: input.frequencia,
+        horario: input.horario,
+      }),
+    ]);
+    const { error: derivErr } = await supabase
+      .from('profiles')
+      .update({ topicos_busca, dominios_busca })
+      .eq('user_id', user.id);
+    if (derivErr) {
+      console.warn('[updateProfile] derivados não gravados:', derivErr.message);
+    }
+  } catch (e) {
+    console.warn('[updateProfile] derivação falhou (preferências já salvas):', e);
+  }
+
   revalidatePath('/settings');
   return { ok: true };
 }
@@ -119,7 +132,9 @@ export interface SampleResult {
   costBrl?: number;
   elapsedSeconds?: number;
   status?: string;
-  cooldownRemainingMs?: number;
+  /** true quando a ação foi recusada porque o usuário já recebeu a 1ª curadoria
+   *  (o "antecipar" é one-shot). O cliente traduz via 'sample.alreadyDelivered'. */
+  alreadyDelivered?: boolean;
   /** Para preview inline em dev. */
   deliveryId?: string;
 }
@@ -139,17 +154,24 @@ export async function sendSampleNow(): Promise<SampleResult> {
   if (error) return { ok: false, error: error.message };
   if (!profileRow) return { ok: false, error: 'perfil não encontrado' };
 
-  // Cooldown segue a frequência do perfil (gravado em sample_cooldown_until na
-  // última geração — travado naquele momento, mudar a frequência depois não
-  // encurta). Coluna ausente (migration não aplicada) → undefined → sem cooldown.
-  // Em DEV (local) o cooldown é ignorado pra facilitar testes.
-  if (process.env.NODE_ENV !== 'development' && profileRow.sample_cooldown_until) {
-    const remainingMs = new Date(profileRow.sample_cooldown_until).getTime() - Date.now();
-    if (remainingMs > 0) {
+  // ONE-SHOT: antecipar vale só pra PRIMEIRA curadoria. Se o usuário já recebeu
+  // qualquer edição (por este botão OU pelo cron), a ação é recusada — a UI já
+  // esconde o card, mas esconder ≠ fechar a ação (server action é endpoint
+  // público pra quem está logado). Em DEV é ignorado pra permitir testes locais.
+  if (process.env.NODE_ENV !== 'development') {
+    const { count: sentCount } = await supabase
+      .from('deliveries')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', user.id)
+      .eq('status', 'sent');
+    if ((sentCount ?? 0) > 0) {
+      // `alreadyDelivered` sinaliza pro cliente traduzir via i18n
+      // ('sample.alreadyDelivered'); o `error` é fallback caso a UI não trate.
       return {
         ok: false,
-        error: `Você já gerou um email recentemente. O próximo poderá ser gerado em ${formatCooldown(remainingMs)} — o intervalo segue a frequência do seu perfil.`,
-        cooldownRemainingMs: remainingMs,
+        alreadyDelivered: true,
+        error:
+          'Você já recebeu sua primeira curadoria. As próximas chegam automaticamente na frequência do seu perfil.',
       };
     }
   }

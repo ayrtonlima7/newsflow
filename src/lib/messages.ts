@@ -165,11 +165,11 @@ const pt: Dictionary = {
   'demail.confirmed': '✓ Email de entrega confirmado!',
 
   // amostra
-  'sample.title': 'Antecipar minha próxima curadoria',
-  'sample.body': 'Manda sua próxima edição agora, em vez de esperar o horário. Vai pro {email} e conta como a curadoria do período — você não recebe duplicado depois. Geração + envio leva ~1-2 minutos; limite de 1 a cada 5 minutos.',
+  'sample.title': 'Antecipar minha primeira curadoria',
+  'sample.body': 'Não quer esperar o horário? Receba sua primeira edição agora, no {email}. Depois dela, as próximas chegam automaticamente na frequência que você escolheu. Geração + envio leva ~1-2 minutos.',
   'sample.send': 'Enviar agora',
   'sample.generating': 'Gerando…',
-  'sample.wait': 'Aguarde {time}',
+  'sample.alreadyDelivered': 'Você já recebeu sua primeira curadoria. As próximas chegam automaticamente na frequência do seu perfil.',
   'sample.working': '✨ Buscando conteúdo na web, gerando o email e enviando. Não saia da página.',
   'sample.sentOk': '✓ Email enviado! Cheque seu inbox (e a pasta de spam na primeira vez).',
 };
@@ -317,11 +317,11 @@ const en: Dictionary = {
   'demail.cleared': '✓ Back to using your account email.',
   'demail.confirmed': '✓ Delivery email confirmed!',
 
-  'sample.title': 'Send my next briefing now',
-  'sample.body': "Sends your next edition right away instead of waiting for the scheduled time. Goes to {email} and counts as this period's briefing — no duplicate later. Generating + sending takes ~1-2 minutes; limit of 1 every 5 minutes.",
+  'sample.title': 'Send my first briefing now',
+  'sample.body': "Don't want to wait for the scheduled time? Get your first edition right now, at {email}. After that, the next ones arrive automatically at the frequency you picked. Generating + sending takes ~1-2 minutes.",
   'sample.send': 'Send now',
   'sample.generating': 'Generating…',
-  'sample.wait': 'Wait {time}',
+  'sample.alreadyDelivered': 'You already received your first briefing. The next ones arrive automatically at your profile frequency.',
   'sample.working': "✨ Searching the web, generating the email and sending. Don't leave the page.",
   'sample.sentOk': '✓ Email sent! Check your inbox (and the spam folder the first time).',
 };
@@ -469,11 +469,11 @@ const es: Dictionary = {
   'demail.cleared': '✓ Volviste a usar el email de la cuenta.',
   'demail.confirmed': '✓ ¡Email de entrega confirmado!',
 
-  'sample.title': 'Adelantar mi próxima curaduría',
-  'sample.body': 'Envía tu próxima edición ahora, en vez de esperar la hora. Va a {email} y cuenta como la curaduría del período — no recibes duplicado después. Generar + enviar toma ~1-2 minutos; límite de 1 cada 5 minutos.',
+  'sample.title': 'Adelantar mi primera curaduría',
+  'sample.body': '¿No quieres esperar la hora? Recibe tu primera edición ahora, en {email}. Después de esa, las siguientes llegan automáticamente en la frecuencia que elegiste. Generar + enviar toma ~1-2 minutos.',
   'sample.send': 'Enviar ahora',
   'sample.generating': 'Generando…',
-  'sample.wait': 'Espera {time}',
+  'sample.alreadyDelivered': 'Ya recibiste tu primera curaduría. Las siguientes llegan automáticamente en la frecuencia de tu perfil.',
   'sample.working': '✨ Buscando contenido en la web, generando el email y enviando. No salgas de la página.',
   'sample.sentOk': '✓ ¡Email enviado! Revisa tu bandeja (y la carpeta de spam la primera vez).',
 };

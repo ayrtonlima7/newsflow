@@ -2,9 +2,15 @@
 
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { getProvider, extractJson } from '@/src/lib/providers';
 import { normalizeTopics } from '@/src/lib/topic-normalization';
 import { deriveDomains } from '@/src/lib/domain-derivation';
+import {
+  decideQuota,
+  spToday,
+  SUGGESTIONS_DAILY_LIMIT,
+} from '@/src/lib/suggestion-quota';
 import type { Profile } from '@/src/lib/types';
 
 export interface TopicSuggestionsContext {
@@ -99,6 +105,90 @@ Responda APENAS com um array JSON de strings, sem markdown:
     const msg = err instanceof Error ? err.message : String(err);
     return { topics: [], error: `falha ao gerar sugestões: ${msg}` };
   }
+}
+
+export interface RegenerateResult {
+  topics: string[];
+  error?: string;
+  /** Regenerações restantes hoje (undefined quando não deu pra apurar). */
+  remaining?: number;
+  /** true quando a cota do dia acabou — a UI mostra a mensagem de limite. */
+  limitReached?: boolean;
+}
+
+/**
+ * Gera sugestões de tópicos SOB DEMANDA (botão "gerar outras"), consumindo a
+ * cota diária. Usada tanto no onboarding quanto em /settings.
+ *
+ * A geração AUTOMÁTICA do wizard (ao chegar na pergunta de tópicos) NÃO passa
+ * por aqui e não consome cota — ela é parte do fluxo. Só o pedido explícito
+ * conta.
+ */
+export async function regenerateTopicSuggestions(
+  ctx: TopicSuggestionsContext,
+): Promise<RegenerateResult> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { topics: [], error: 'não autenticado' };
+
+  // Cota via ADMIN client: a tabela tem RLS sem policies (o usuário não pode
+  // ler nem zerar a própria cota).
+  const admin = createAdminClient();
+  const today = spToday();
+  let decision = { allowed: true, nextCount: 1, remaining: SUGGESTIONS_DAILY_LIMIT - 1 };
+  let quotaTracked = false;
+
+  try {
+    const { data: row, error: readErr } = await admin
+      .from('suggestion_quota')
+      .select('used_date, used_count')
+      .eq('user_id', user.id)
+      .maybeSingle();
+    if (readErr) throw new Error(readErr.message);
+
+    decision = decideQuota(row ?? null, today);
+    quotaTracked = true;
+
+    if (!decision.allowed) {
+      return {
+        topics: [],
+        limitReached: true,
+        remaining: 0,
+        error: `Limite de ${SUGGESTIONS_DAILY_LIMIT} regenerações por dia atingido.`,
+      };
+    }
+  } catch (e) {
+    // Migration 0015 ainda não aplicada (ou banco indisponível) → FALHA ABERTA:
+    // a feature continua funcionando sem contar cota, em vez de morrer silenciosa.
+    console.warn(
+      '[regenerateTopicSuggestions] cota não apurada (migration 0015 aplicada?):',
+      e instanceof Error ? e.message : e,
+    );
+  }
+
+  const result = await generateTopicSuggestions(ctx);
+
+  // Só consome a cota se a geração deu certo — erro de LLM não deve queimar
+  // tentativa do usuário.
+  if (quotaTracked && result.topics.length > 0) {
+    const { error: upErr } = await admin.from('suggestion_quota').upsert(
+      {
+        user_id: user.id,
+        used_date: today,
+        used_count: decision.nextCount,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: 'user_id' },
+    );
+    if (upErr) console.warn('[regenerateTopicSuggestions] cota não gravada:', upErr.message);
+  }
+
+  return {
+    ...result,
+    remaining: quotaTracked && result.topics.length > 0 ? decision.remaining : undefined,
+  };
 }
 
 export async function saveProfile(profile: Profile): Promise<{ ok: boolean; error?: string }> {

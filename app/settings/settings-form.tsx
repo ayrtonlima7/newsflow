@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { getQuestions, isQuestionShown, type QuestionId } from '@/app/onboarding/questions';
 import { StepCard } from '@/app/onboarding/step-card';
+import { useTopicSuggestions } from '@/app/onboarding/use-topic-suggestions';
 import { useLocale, useT } from '@/app/_i18n/provider';
 import { updateProfile, setActive, type ProfileUpdateInput } from './actions';
 
@@ -24,6 +25,16 @@ export function SettingsForm({ initial, isActive: initialActive }: Props) {
   const [active, setActiveState] = useState(initialActive);
   const [pending, startTransition] = useTransition();
   const [feedback, setFeedback] = useState<Feedback | null>(null);
+  // Sugestões de tópicos sob demanda. Diferente do onboarding, aqui NÃO geramos
+  // automático ao abrir a página — seria uma chamada de LLM em toda visita a
+  // /settings. O usuário pede clicando no botão (e a cota diária vale igual).
+  const {
+    topics: suggestedTopics,
+    regenerating,
+    blocked: regenBlocked,
+    note: regenNote,
+    regenerate,
+  } = useTopicSuggestions();
 
   const isDirty = JSON.stringify(values) !== JSON.stringify(initial);
 
@@ -107,6 +118,28 @@ export function SettingsForm({ initial, isActive: initialActive }: Props) {
               question={q}
               value={values[id] as string | string[]}
               onChange={(v) => update(id, v as ProfileUpdateInput[typeof id])}
+              {...(id === 'topicos'
+                ? {
+                    dynamicChips: suggestedTopics,
+                    // Contexto = valores ATUAIS do formulário (inclusive edições
+                    // não salvas), pra sugestão refletir o que a pessoa acabou
+                    // de mudar.
+                    onRegenerate: () =>
+                      regenerate({
+                        nome: values.nome,
+                        tema: values.tema,
+                        contexto: values.contexto,
+                        descricao_livre: values.descricao_livre,
+                        objetivo: values.objetivo,
+                        referencias: values.referencias,
+                        formatos: values.formatos,
+                        ignorar: values.ignorar,
+                      }),
+                    regenerating,
+                    regenerateBlocked: regenBlocked,
+                    regenerateNote: regenNote,
+                  }
+                : {})}
             />
           </div>
         );

@@ -5,6 +5,7 @@ import { getQuestions, isQuestionShown, type QuestionId } from './questions';
 import { StepCard } from './step-card';
 import { ConfirmCard } from './confirm-card';
 import { generateTopicSuggestions } from './actions';
+import { useTopicSuggestions } from './use-topic-suggestions';
 import { useT, useLocale } from '../_i18n/provider';
 import { track } from '@/src/lib/analytics/track';
 import { ANALYTICS_EVENTS } from '@/src/lib/analytics/events';
@@ -44,9 +45,18 @@ export function OnboardingWizard({ userEmail }: { userEmail: string }) {
   const questions = useMemo(() => getQuestions(locale), [locale]);
   const [step, setStep] = useState(0);
   const [answers, setAnswers] = useState<Answers>(empty);
-  const [dynamicTopics, setDynamicTopics] = useState<string[]>([]);
   const [loadingTopics, setLoadingTopics] = useState(false);
   const [topicsError, setTopicsError] = useState<string | null>(null);
+  // Sugestões + cota de regeneração (mesmo hook usado em /settings).
+  // `setTopics` alimenta a geração AUTOMÁTICA do wizard (que não gasta cota).
+  const {
+    topics: dynamicTopics,
+    setTopics: setDynamicTopics,
+    regenerating,
+    blocked: regenBlocked,
+    note: regenNote,
+    regenerate,
+  } = useTopicSuggestions();
   const [, startTransition] = useTransition();
 
   // Total de perguntas visíveis (varia com a pergunta condicional)
@@ -219,6 +229,24 @@ export function OnboardingWizard({ userEmail }: { userEmail: string }) {
         onChange={updateAnswer}
         loading={loadingTopics && currentQuestion!.id === 'topicos'}
         dynamicChips={dynamicTopics}
+        {...(currentQuestion!.id === 'topicos'
+          ? {
+              onRegenerate: () =>
+                regenerate({
+                  nome: answers.nome,
+                  tema: answers.tema,
+                  contexto: answers.contexto,
+                  descricao_livre: answers.descricao_livre,
+                  objetivo: answers.objetivo,
+                  referencias: answers.referencias,
+                  formatos: answers.formatos,
+                  ignorar: answers.ignorar,
+                }),
+              regenerating,
+              regenerateBlocked: regenBlocked,
+              regenerateNote: regenNote,
+            }
+          : {})}
       />
 
       {topicsError && currentQuestion!.id === 'topicos' && (

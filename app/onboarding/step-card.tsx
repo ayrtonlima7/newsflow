@@ -14,9 +14,28 @@ interface Props {
   onChange: (value: string | string[]) => void;
   loading?: boolean;
   dynamicChips?: string[];
+  /** Quando fornecido, mostra o botão de (re)gerar sugestões abaixo dos chips.
+   *  Opt-in: só as telas que sabem gerar (onboarding e /settings) passam. */
+  onRegenerate?: () => void;
+  /** Geração sob demanda em andamento (trava o botão). */
+  regenerating?: boolean;
+  /** Cota esgotada — desabilita o botão e exibe `regenerateNote`. */
+  regenerateBlocked?: boolean;
+  /** Aviso curto sob o botão (ex: "resta 1 hoje" ou limite atingido). */
+  regenerateNote?: string | null;
 }
 
-export function StepCard({ question, value, onChange, loading, dynamicChips }: Props) {
+export function StepCard({
+  question,
+  value,
+  onChange,
+  loading,
+  dynamicChips,
+  onRegenerate,
+  regenerating,
+  regenerateBlocked,
+  regenerateNote,
+}: Props) {
   const t = useT();
   const chips =
     question.type === 'multi' && question.dynamic ? (dynamicChips ?? []) : question.chips;
@@ -102,6 +121,10 @@ export function StepCard({ question, value, onChange, loading, dynamicChips }: P
           toggleChip={toggleChip}
           onClearSingle={() => onChange('')}
           loading={loading}
+          onRegenerate={onRegenerate}
+          regenerating={regenerating}
+          regenerateBlocked={regenerateBlocked}
+          regenerateNote={regenerateNote}
         />
       )}
 
@@ -269,6 +292,10 @@ function InputFirstLayout({
   toggleChip,
   onClearSingle,
   loading,
+  onRegenerate,
+  regenerating,
+  regenerateBlocked,
+  regenerateNote,
 }: {
   question: Question;
   value: string | string[];
@@ -280,6 +307,10 @@ function InputFirstLayout({
   toggleChip: (chip: string) => void;
   onClearSingle: () => void;
   loading?: boolean;
+  onRegenerate?: () => void;
+  regenerating?: boolean;
+  regenerateBlocked?: boolean;
+  regenerateNote?: string | null;
 }) {
   const t = useT();
   const selected = isMulti ? (Array.isArray(value) ? value : []) : [];
@@ -380,6 +411,29 @@ function InputFirstLayout({
               </button>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* (Re)gerar sugestões — só quando a tela sabe gerar (onboarding/settings).
+          Rótulo muda: sem chips ainda = "ver sugestões"; com chips = "gerar outras". */}
+      {onRegenerate && !loading && (
+        <div className="space-y-1.5 pt-1">
+          <button
+            type="button"
+            onClick={onRegenerate}
+            disabled={regenerating || regenerateBlocked}
+            className="inline-flex items-center gap-2 rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-1.5 text-xs text-[var(--color-fg)] transition hover:border-[var(--color-fg)] disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {regenerating && <SpinnerIcon />}
+            {regenerating
+              ? t('topics.regenerating')
+              : chips.length === 0
+                ? t('topics.suggest')
+                : t('topics.regenerate')}
+          </button>
+          {regenerateNote && (
+            <p className="text-xs text-[var(--color-muted)]">{regenerateNote}</p>
+          )}
         </div>
       )}
     </div>

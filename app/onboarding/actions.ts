@@ -128,16 +128,13 @@ export async function saveProfile(profile: Profile): Promise<{ ok: boolean; erro
     return { ok: false, error: 'escolha pelo menos um formato' };
   }
 
-  const [topicos_busca, dominios_busca] = await Promise.all([
-    normalizeTopics(profile.topicos, {
-      tema: profile.tema,
-      contexto: profile.contexto.join(', '),
-      descricao_livre: profile.descricao_livre,
-      objetivo: profile.objetivo.join(', '),
-    }),
-    deriveDomains(profile),
-  ]);
-
+  // --- Passo 1: SALVA o perfil PRIMEIRO, sem os campos derivados. ---
+  // Antes as 2 chamadas de LLM (normalizeTopics + deriveDomains) rodavam ANTES do
+  // upsert: se estourassem o timeout da função, ela morria antes de gravar e o
+  // usuário ficava preso no onboarding ("o perfil não é gerado"). Agora o save é
+  // incondicionalmente durável — o perfil funciona sem os derivados:
+  // `topicos_busca` vazio → o pipeline usa `topicos` cru (profileForPrompt);
+  // `dominios_busca` null → resolveDomains() cai na lista estática.
   const { error } = await supabase.from('profiles').upsert(
     {
       user_id: user.id,
@@ -147,8 +144,6 @@ export async function saveProfile(profile: Profile): Promise<{ ok: boolean; erro
       descricao_livre: profile.descricao_livre ?? '',
       objetivo: profile.objetivo,
       topicos: profile.topicos,
-      topicos_busca,
-      dominios_busca,
       referencias: profile.referencias ?? [],
       formatos: profile.formatos,
       ignorar: profile.ignorar ?? [],
@@ -162,6 +157,30 @@ export async function saveProfile(profile: Profile): Promise<{ ok: boolean; erro
   if (error) {
     console.error('[saveProfile] erro:', error);
     return { ok: false, error: error.message };
+  }
+
+  // --- Passo 2: deriva os campos de busca e atualiza (best-effort). ---
+  // Falha/timeout aqui NÃO impede o usuário de seguir: o perfil já está salvo e
+  // funcional. `npm run rederive-domains` faz o backfill dos que ficaram vazios.
+  try {
+    const [topicos_busca, dominios_busca] = await Promise.all([
+      normalizeTopics(profile.topicos, {
+        tema: profile.tema,
+        contexto: profile.contexto.join(', '),
+        descricao_livre: profile.descricao_livre,
+        objetivo: profile.objetivo.join(', '),
+      }),
+      deriveDomains(profile),
+    ]);
+    const { error: derivErr } = await supabase
+      .from('profiles')
+      .update({ topicos_busca, dominios_busca })
+      .eq('user_id', user.id);
+    if (derivErr) {
+      console.warn('[saveProfile] derivados não gravados:', derivErr.message);
+    }
+  } catch (e) {
+    console.warn('[saveProfile] derivação falhou (perfil já salvo, segue):', e);
   }
 
   redirect('/settings?welcome=1');

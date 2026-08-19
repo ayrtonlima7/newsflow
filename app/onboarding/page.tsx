@@ -5,6 +5,11 @@ import { IdentifyUser } from '../_analytics/identify-user';
 import { getLocale } from '../_i18n/locale';
 import { getDictionary, translate } from '@/src/lib/messages';
 
+// saveProfile deriva topicos_busca + dominios_busca (2 chamadas de LLM) antes de
+// redirecionar. Sem isso a rota herdava o default curto da Vercel e a função podia
+// ser morta no meio → perfil não salvava e o usuário ficava preso no onboarding.
+export const maxDuration = 60;
+
 export default async function OnboardingPage() {
   const supabase = await createClient();
   const {

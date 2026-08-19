@@ -236,7 +236,7 @@ export async function generateBriefing(
     return {
       briefing: { data_referencia: janela.todayISO, itens: [] },
       meta: {
-        provider: 'tavily+none',
+        provider: `${searchProvider}+none`,
         model: '-',
         elapsedSeconds: (Date.now() - t0) / 1000,
         usage: emptyUsage(),
@@ -435,7 +435,10 @@ export async function generateBriefing(
   return {
     briefing,
     meta: {
-      provider: `tavily+${provider.name}`,
+      // Label da fonte real de busca + LLM (ex: "merge+deepseek" = fan-out
+      // Serper+RSS). Era hardcoded "tavily+…" e ficou enganoso após a troca
+      // pro Serper — auditoria de briefing precisa refletir a fonte de verdade.
+      provider: `${searchProvider}+${provider.name}`,
       model: provider.model,
       elapsedSeconds,
       usage: result.usage,

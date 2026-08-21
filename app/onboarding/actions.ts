@@ -11,6 +11,7 @@ import {
   spToday,
   SUGGESTIONS_DAILY_LIMIT,
 } from '@/src/lib/suggestion-quota';
+import { isFreeMode } from '@/src/lib/subscription';
 import type { Profile } from '@/src/lib/types';
 
 export interface TopicSuggestionsContext {
@@ -225,6 +226,11 @@ export async function saveProfile(profile: Profile): Promise<{ ok: boolean; erro
   // incondicionalmente durável — o perfil funciona sem os derivados:
   // `topicos_busca` vazio → o pipeline usa `topicos` cru (profileForPrompt);
   // `dominios_busca` null → resolveDomains() cai na lista estática.
+  // Modo grátis ligado → o perfil nasce com acesso VITALÍCIO. É a promessa do
+  // requisito: quem entrou na era grátis continua recebendo mesmo se a flag
+  // voltar pra OFF. (Assinante pagante não passa por aqui — ele já tem perfil.)
+  const freeMode = isFreeMode();
+
   const { error } = await supabase.from('profiles').upsert(
     {
       user_id: user.id,
@@ -240,6 +246,7 @@ export async function saveProfile(profile: Profile): Promise<{ ok: boolean; erro
       frequencia: profile.frequencia,
       horario: profile.horario || '8h',
       is_active: true,
+      ...(freeMode ? { free_forever: true } : {}),
     },
     { onConflict: 'user_id' },
   );

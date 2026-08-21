@@ -23,6 +23,9 @@ interface Props {
   /** Fim do período de teste (ISO). Se no futuro, está em trial. */
   trialEnd?: string | null;
   justSubscribed?: boolean;
+  /** Modo grátis global (FREE_MODE). Quando true, a UI não mostra NENHUM
+   *  indicativo de pagamento — nem preço, nem checkout, nem cupom. */
+  freeMode?: boolean;
 }
 
 export function SubscriptionCard({
@@ -32,6 +35,7 @@ export function SubscriptionCard({
   cancelAtPeriodEnd,
   trialEnd,
   justSubscribed,
+  freeMode,
 }: Props) {
   const router = useRouter();
   const t = useT();
@@ -85,6 +89,32 @@ export function SubscriptionCard({
         setError(res.error ?? 'erro ao resgatar cupom');
       }
     });
+  }
+
+  // --- Modo grátis: acesso liberado, ZERO menção a pagamento ---
+  // Cobre o usuário da era grátis (inclusive o vitalício, quando a flag já
+  // voltou pra OFF — daí o texto muda pra deixar claro que o acesso é dele).
+  if (gateState === 'free_era') {
+    return (
+      <div className="rounded-lg border border-emerald-300 bg-emerald-50 p-5">
+        <p className="text-sm font-medium text-emerald-900">
+          {freeMode ? t('sub.freeTitle') : t('sub.lifetimeTitle')}
+        </p>
+        <p className="mt-1 text-xs text-emerald-700">
+          {freeMode ? t('sub.freeBody') : t('sub.lifetimeBody')}
+        </p>
+      </div>
+    );
+  }
+
+  // --- Assinante com cobrança pausada (produto está grátis pra todos) ---
+  if (gateState === 'frozen') {
+    return (
+      <div className="rounded-lg border border-sky-300 bg-sky-50 p-5">
+        <p className="text-sm font-medium text-sky-900">{t('sub.frozenTitle')}</p>
+        <p className="mt-1 text-xs text-sky-700">{t('sub.frozenBody')}</p>
+      </div>
+    );
   }
 
   // --- Assinante ativo (inclui trial e "cancelado mas vigente") ---
@@ -168,6 +198,19 @@ export function SubscriptionCard({
           {pending ? t('sub.opening') : t('sub.updatePayment')}
         </button>
         {error && <p className="mt-2 text-sm text-red-700">{error}</p>}
+      </div>
+    );
+  }
+
+  // Trava defensiva: com o modo grátis ligado o paywall NUNCA renderiza, nem se
+  // um estado inesperado chegar aqui. (canDeliver já devolve free_era/frozen em
+  // modo grátis, mas o requisito é "on = sem nenhum indicativo de pagamento" —
+  // então a garantia fica também no ponto de renderização.)
+  if (freeMode) {
+    return (
+      <div className="rounded-lg border border-emerald-300 bg-emerald-50 p-5">
+        <p className="text-sm font-medium text-emerald-900">{t('sub.freeTitle')}</p>
+        <p className="mt-1 text-xs text-emerald-700">{t('sub.freeBody')}</p>
       </div>
     );
   }

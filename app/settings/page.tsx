@@ -7,7 +7,7 @@ import { SubscriptionCard } from './subscription-card';
 import { DeliveryEmailCard } from './delivery-email-card';
 import { ContactCard } from './contact-card';
 import { IdentifyUser } from '../_analytics/identify-user';
-import { canDeliver, type SubscriptionStatus } from '@/src/lib/subscription';
+import { canDeliver, isFreeMode, type SubscriptionStatus } from '@/src/lib/subscription';
 import { getLocale } from '../_i18n/locale';
 import { getDictionary, translate } from '@/src/lib/messages';
 import type { ProfileUpdateInput } from './actions';
@@ -52,10 +52,14 @@ export default async function SettingsPage({
 
   const isAdmin = !!process.env.ADMIN_EMAIL && user.email === process.env.ADMIN_EMAIL;
 
-  // Estado de assinatura pro card (Stripe é a fonte da verdade)
-  const gate = canDeliver(
-    (profile.subscription_status ?? 'free') as SubscriptionStatus,
-  );
+  // Estado de acesso pro card. Com FREE_MODE ligado o produto é grátis: o gate
+  // libera todo mundo e a UI não mostra NENHUM indicativo de pagamento.
+  const freeMode = isFreeMode();
+  const gate = canDeliver({
+    status: (profile.subscription_status ?? 'free') as SubscriptionStatus,
+    freeForever: profile.free_forever ?? false,
+    freeMode,
+  });
 
   const dict = getDictionary(await getLocale());
   const t = (k: string) => translate(dict, k);
@@ -110,6 +114,7 @@ export default async function SettingsPage({
         cancelAtPeriodEnd={profile.cancel_at_period_end ?? false}
         trialEnd={profile.trial_end ?? null}
         justSubscribed={sub === 'success'}
+        freeMode={freeMode}
       />
 
       <DeliveryEmailCard

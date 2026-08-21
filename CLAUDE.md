@@ -131,6 +131,28 @@ On profile save (onboarding + settings), `deriveDomains(profile)` calls **DeepSe
 - cron-job.org free tier has a **30s request timeout**, and one curation takes ~30-40s — so a synchronous run made cron-job.org report "timeout/failure" even though the email sent. **Fixed:** the scheduled call (no `dry`/`force`/`user_id` flags) now returns **202 immediately** and runs the deliveries in the background via Next 15's **`after()`** (`processDeliveries()` helper) — cron-job.org gets a fast 200, no false-failure, no retry-driven duplicate. The background work is still bounded by `maxDuration` (180) / the Vercel plan cap; users not reached before the cap are picked up on the next 30-min tick (idempotency prevents dupes). **Manual/debug calls (`dry=1`/`force=1`/`user_id=`) stay SYNCHRONOUS** and return the detailed `results` array.
 - Vercel Hobby caps functions at 60s. At ~22s/user **sequential**, 2 users at the same hour ≈ 44s (ok), 3+ risks timeout. Fix for scale: per-user invocation (fan-out) or a queue (Upstash QStash).
 
+### Modelo de negócio — feature flag `FREE_MODE`
+
+A flag global **`FREE_MODE`** (env var, server-only, lida por `isFreeMode()` em `src/lib/subscription.ts`) alterna o modelo de negócio do produto inteiro. **Env var em vez de registro no banco de propósito:** virar o modelo exige um deploy deliberado (não vira por acidente) e não custa uma leitura de rede por requisição. ⚠️ Trocar o valor na Vercel **exige redeploy**.
+
+| | `FREE_MODE` off (default) | `FREE_MODE` on |
+|---|---|---|
+| Acesso | só `active` (Stripe, inclui trial) ou `manual` | **todos** |
+| UI | paywall, preços, checkout, cupom | **nenhum indicativo de pagamento** |
+| Novo usuário | precisa assinar | ganha **vitalício** |
+| Assinante existente | cobrado normalmente | cobrança **pausada** |
+
+**O que a flag NÃO consegue guardar** (porque ela muda e o efeito no usuário é permanente) vive em 2 colunas de `profiles` (migration `0016`):
+
+- **`free_forever`** — acesso vitalício da "era grátis". `canDeliver()` o respeita **acima de tudo**, então virar a flag pra off **não tira** o acesso de quem entrou grátis. É estampado em 2 pontos: `saveProfile` (perfil criado com a flag on) e `checkGate` em `delivery.ts` (quando o acesso é exercido — pega também quem já existia como `free`). Nunca revogado.
+- **`billing_paused_at`** — marca de que a cobrança daquele assinante está pausada no Stripe. Serve de idempotência pro comando de reconciliação.
+
+**Separação deliberada entre acesso e cobrança:** a flag libera o acesso no deploy, mas **mexer no Stripe é um comando à parte** — `npm run sync-billing [-- --dry]`. Motivo: uma falha da API do Stripe não pode derrubar a entrega de email de ninguém, e operação sobre dinheiro deve ser explícita, idempotente e re-executável. Rode-o **depois** de virar a flag: on → `pause_collection: void` nos assinantes vivos; off → remove a pausa. Assinatura `canceled` é ignorada (não há o que retomar).
+
+⚠️ **Ordem de deploy:** `checkGate` usa `select('*')` (e não as colunas nomeadas) justamente para o código sobreviver a um deploy **antes** da migration — um select em coluna inexistente erraria, `profile` viria null, o status cairia pra `free` e o gate **bloquearia todos os assinantes**. Com `'*'` a coluna vem `undefined` e o modelo pago segue intacto.
+
+`canDeliver()` é pura e aceita `SubscriptionStatus` (compat com chamadas antigas) ou `AccessInput` (`{status, freeForever, freeMode}`). Estados novos pra UI: `free_era` (grátis/vitalício) e `frozen` (assinante com cobrança pausada). `createCheckoutSession` **recusa** em modo grátis — a UI não oferece, mas server action é endpoint acessível a qualquer logado.
+
 ### Auth & RLS
 
 Supabase Auth via `@supabase/ssr`. **Login is unified on the home page (`/`)** — the landing pitch + the `LoginForm` (Google OAuth + email magic-link) render together; `/login` is now just a redirect to `/` (preserves `next`/`error`). An authenticated user hitting `/` is redirected to `/settings`. `middleware.ts` runs `getUser()` on every request to refresh tokens and gates `/onboarding`, `/settings`, `/dashboard` — unauthenticated hits redirect to `/?next=<path>`. RLS is enabled on `profiles`, `briefings`, `deliveries` — owners can read their own rows; writes from the pipeline use the **admin (service-role) client** which bypasses RLS. Never use the admin client in code that reaches the browser. `/api/admin/stats` is gated by matching `user.email === ADMIN_EMAIL`.

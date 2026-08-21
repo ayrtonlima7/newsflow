@@ -16,6 +16,7 @@
     "preview": "tsx src/cli/preview.ts",
     "reset-users": "tsx src/cli/reset-users.ts",
     "rederive-domains": "tsx src/cli/rederive-domains.ts",
+    "sync-billing": "tsx src/cli/sync-billing.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest"

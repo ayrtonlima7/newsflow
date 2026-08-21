@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getStripe } from '@/lib/stripe/client';
+import { isFreeMode } from '@/src/lib/subscription';
 
 function appUrl(): string {
   return (
@@ -41,6 +42,13 @@ async function ensureCustomer(userId: string, email: string): Promise<string> {
 export async function createCheckoutSession(
   plan: 'mensal' | 'anual',
 ): Promise<{ url?: string; error?: string }> {
+  // Modo grátis: ninguém deve conseguir pagar por um produto que está aberto.
+  // A UI já não oferece checkout, mas server action é endpoint acessível a
+  // qualquer logado — a recusa tem que estar aqui também.
+  if (isFreeMode()) {
+    return { error: 'O NewsFlow está aberto pra todos no momento — não há o que assinar.' };
+  }
+
   const supabase = await createClient();
   const {
     data: { user },

@@ -1,7 +1,7 @@
 import { Resend } from 'resend';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { generateBriefing, generateEmail } from './pipeline';
-import { canDeliver, type SubscriptionStatus } from './subscription';
+import { canDeliver, isFreeMode, type SubscriptionStatus } from './subscription';
 import { frequenciaParaJanela, type Profile } from './types';
 
 export interface DeliveryInput {
@@ -42,20 +42,51 @@ function appUrl(): string {
   );
 }
 
-/** Lê o status de assinatura e aplica o gating (Stripe é a fonte da verdade). */
+/** Lê o status de assinatura e aplica o gating (Stripe é a fonte da verdade,
+ *  com a flag FREE_MODE e o vitalício `free_forever` como camadas acima). */
 async function checkGate(
   supabase: ReturnType<typeof createAdminClient>,
   userId: string,
 ): Promise<{ allowed: boolean; reason: string }> {
+  // `select('*')` de propósito (e não as duas colunas nomeadas): se este código
+  // subir ANTES da migration 0016, um select em `free_forever` inexistente
+  // ERRARIA, `profile` viria null, o status cairia pra 'free' e o gate
+  // BLOQUEARIA todos os assinantes. Com '*' a coluna simplesmente vem undefined
+  // e o comportamento pago segue intacto. É uma linha só, e evita um incidente.
   const { data: profile } = await supabase
     .from('profiles')
-    .select('subscription_status')
+    .select('*')
     .eq('user_id', userId)
     .maybeSingle();
 
   const status = (profile?.subscription_status ?? 'free') as SubscriptionStatus;
+  const freeMode = isFreeMode();
 
-  const gate = canDeliver(status);
+  const gate = canDeliver({
+    status,
+    freeForever: profile?.free_forever ?? false,
+    freeMode,
+  });
+
+  // Estampa o VITALÍCIO no momento em que o acesso é exercido na era grátis.
+  // É aqui (e no saveProfile) que a promessa "entrou grátis, fica grátis pra
+  // sempre" se torna permanente — a flag pode mudar, a coluna não.
+  // Best-effort: falha aqui (ex: migration 0016 não aplicada) não derruba a
+  // entrega; só não persiste o vitalício, e a próxima tentativa reestampa.
+  if (gate.shouldGrantLifetime) {
+    const { error } = await supabase
+      .from('profiles')
+      .update({ free_forever: true })
+      .eq('user_id', userId);
+    if (error) {
+      console.warn(
+        `[delivery] free_forever não gravado (migration 0016 aplicada?): ${error.message}`,
+      );
+    } else {
+      console.log(`[delivery] acesso vitalício concedido (era grátis) — user ${userId}`);
+    }
+  }
+
   if (!gate.allowed) {
     console.log(`[delivery] bloqueado pelo gate: ${gate.reason} (user ${userId})`);
   }

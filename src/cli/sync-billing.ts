@@ -75,7 +75,10 @@ async function main() {
     return;
   }
 
-  const stripe = getStripe();
+  // Só instancia o Stripe pra valer quando NÃO é dry run: o dry precisa rodar em
+  // qualquer ambiente (inclusive local, sem STRIPE_SECRET_KEY) — é o ensaio que
+  // você faz ANTES de apontar pro ambiente que tem a chave.
+  const stripe = dry ? null : getStripe();
   let ok = 0;
   let fail = 0;
 
@@ -87,7 +90,7 @@ async function main() {
     }
     try {
       // behavior 'void': não gera fatura a cobrar durante a pausa.
-      await stripe.subscriptions.update(p.stripe_subscription_id!, {
+      await stripe!.subscriptions.update(p.stripe_subscription_id!, {
         pause_collection: { behavior: 'void' },
       });
       const { error: upErr } = await supabase
@@ -110,7 +113,7 @@ async function main() {
       continue;
     }
     try {
-      await stripe.subscriptions.update(p.stripe_subscription_id!, {
+      await stripe!.subscriptions.update(p.stripe_subscription_id!, {
         pause_collection: null,
       });
       const { error: upErr } = await supabase

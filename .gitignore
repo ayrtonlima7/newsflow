@@ -14,3 +14,7 @@ tsconfig.tsbuildinfo
 .claude/scheduled_tasks.lock
 .vercel
 .env*
+
+# Arquivos locais que não devem ser versionados
+newsflow_ai_prompts.docx
+supabase/.temp/
